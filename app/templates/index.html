@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title data-i18n="app.title">{{ i18n.app.title }}</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <strong data-i18n="app.title">{{ i18n.app.title }}</strong>
+      <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
+    </div>
+    <div class="controls">
+      <div class="lang">
+        <button type="button" class="lang-btn" data-lang="de" data-i18n="header.lang_de">DE</button>
+        <button type="button" class="lang-btn" data-lang="ru" data-i18n="header.lang_ru">RU</button>
+      </div>
+      <label><span data-i18n="header.model">{{ i18n.header.model }}</span>
+        <select id="modelSelect">
+          <option value="SKINOVA_10" data-i18n="models.SKINOVA_10">Skinova 10</option>
+          <option value="SKINOVA_19" selected data-i18n="models.SKINOVA_19">Skinova 19</option>
+          <option value="SKINOVA_MED" data-i18n="models.SKINOVA_MED">Skinova MED</option>
+        </select>
+      </label>
+      <button id="btnStart" class="primary" data-i18n="header.start">{{ i18n.header.start }}</button>
+      <button id="btnPause" data-i18n="header.pause">{{ i18n.header.pause }}</button>
+      <button id="btnReset" data-i18n="header.reset">{{ i18n.header.reset }}</button>
+      <button id="btnDock" data-i18n="header.dock">{{ i18n.header.dock }}</button>
+      <button id="btnUndock" data-i18n="header.undock">{{ i18n.header.undock }}</button>
+      <button id="btnWrite" data-i18n="header.write">{{ i18n.header.write }}</button>
+      <button id="btnTheme" data-i18n="header.theme">{{ i18n.header.theme }}</button>
+    </div>
+  </header>
+
+  <p class="disclaimer" data-i18n="app.disclaimer">{{ i18n.app.disclaimer }}</p>
+
+  <main class="grid">
+    <section class="panel">
+      <h2 data-i18n="panels.program">{{ i18n.panels.program }}</h2>
+      <label><span data-i18n="fields.program_select">{{ i18n.fields.program_select }}</span>
+        <select id="programSelect"></select>
+      </label>
+      <label><span data-i18n="fields.duration_s">{{ i18n.fields.duration_s }}</span>
+        <input type="number" id="durationS" min="1" max="720" step="1" value="720" />
+      </label>
+      <label><span data-i18n="panels.mode">{{ i18n.panels.mode }}</span>
+        <select id="modeSelect">
+          <option value="CONT" data-i18n="fields.mode_cont">CONT</option>
+          <option value="PR_1_2" selected data-i18n="fields.mode_1_2">1:2</option>
+          <option value="PR_1_5" data-i18n="fields.mode_1_5">1:5</option>
+        </select>
+      </label>
+      <label><span data-i18n="fields.i_sata_wcm2">{{ i18n.fields.i_sata_wcm2 }}</span>
+        <input type="number" id="iSata" min="0.05" max="0.5" step="0.01" value="0.30" />
+      </label>
+      <label><span data-i18n="fields.prf_hz">{{ i18n.fields.prf_hz }}</span>
+        <input type="number" id="prfHz" min="50" max="1000" step="10" value="100" />
+      </label>
+      <label><span data-i18n="panels.duty_interp">{{ i18n.panels.duty_interp }}</span>
+        <select id="dutyInterp">
+          <option value="RATIO_ON_OFF" data-i18n="fields.duty_ratio_on_off">RATIO_ON_OFF</option>
+          <option value="ON_OVER_PERIOD" data-i18n="fields.duty_on_over_period">ON_OVER_PERIOD</option>
+        </select>
+      </label>
+      <label><span data-i18n="panels.limit_domain">{{ i18n.panels.limit_domain }}</span>
+        <select id="limitDomain">
+          <option value="SATA" data-i18n="fields.limit_sata">SATA</option>
+          <option value="SAPA" data-i18n="fields.limit_sapa">SAPA</option>
+        </select>
+      </label>
+      <label><span data-i18n="panels.zones">{{ i18n.panels.zones }}</span>
+        <input type="text" id="zones" readonly value="face" />
+      </label>
+      <button id="btnApply" data-i18n="actions.apply">{{ i18n.actions.apply }}</button>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.piezo_driver">{{ i18n.panels.piezo_driver }}</h2>
+      <label><span data-i18n="fields.c0_nF">{{ i18n.fields.c0_nF }}</span>
+        <input type="number" id="c0nF" min="0.8" max="3" step="0.1" value="1.5" />
+      </label>
+      <label><span data-i18n="fields.vdrive">{{ i18n.fields.vdrive }}</span>
+        <input type="number" id="vdrive" min="20" max="80" step="1" value="40" />
+      </label>
+      <label><span data-i18n="fields.eta_elec">{{ i18n.fields.eta_elec }}</span>
+        <input type="number" id="etaElec" min="0.4" max="0.95" step="0.01" value="0.7" />
+      </label>
+      <label><span data-i18n="fields.stack_eff">{{ i18n.fields.stack_eff }}</span>
+        <input type="number" id="stackEff" min="0.5" max="0.8" step="0.01" value="0.65" />
+      </label>
+      <div class="live-grid" id="livePiezo">
+        <div><span data-i18n="fields.r1">R1</span>: <b id="vR1">—</b></div>
+        <div><span data-i18n="fields.p_ac">P_ac</span>: <b id="vPac">—</b></div>
+        <div><span data-i18n="fields.p_bat">P_bat</span>: <b id="vPbat">—</b></div>
+        <div><span data-i18n="fields.contact">Kontakt</span>: <b id="vContact">—</b></div>
+        <div><span data-i18n="fields.vswr">VSWR</span>: <b id="vVswr">—</b></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.acoustics">{{ i18n.panels.acoustics }}</h2>
+      <label class="check"><input type="checkbox" id="gelPresent" checked />
+        <span data-i18n="fields.gel_present">{{ i18n.fields.gel_present }}</span></label>
+      <label><span data-i18n="fields.force_n">{{ i18n.fields.force_n }}</span>
+        <input type="number" id="forceN" min="0.5" max="2" step="0.1" value="1.0" />
+      </label>
+      <label><span data-i18n="fields.x_half">{{ i18n.fields.x_half }}</span>
+        <input type="text" id="xHalf" readonly value="—" />
+      </label>
+      <label class="check"><input type="checkbox" id="enable2d" />
+        <span data-i18n="fields.enable_2d">{{ i18n.fields.enable_2d }}</span></label>
+      <div class="live-grid">
+        <div><span data-i18n="fields.f0">f0</span>: <b id="vF0">—</b></div>
+        <div><span data-i18n="fields.lambda">λ</span>: <b id="vLam">—</b></div>
+        <div><span data-i18n="fields.zn">z_n</span>: <b id="vZn">—</b></div>
+        <div><span data-i18n="fields.gel_thickness">Gel</span>: <b id="vGel">—</b></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.operator">{{ i18n.panels.operator }}</h2>
+      <label><span data-i18n="panels.operator">Path</span>
+        <select id="pathSelect">
+          <option value="circle" data-i18n="fields.path_circle">circle</option>
+          <option value="linear" data-i18n="fields.path_linear">linear</option>
+          <option value="still" data-i18n="fields.path_still">still</option>
+        </select>
+      </label>
+      <label><span data-i18n="fields.dt_macro">{{ i18n.fields.dt_macro }}</span>
+        <input type="number" id="dtMacro" min="1" max="10" step="1" value="5" />
+      </label>
+      <label><span data-i18n="fields.seed">{{ i18n.fields.seed }}</span>
+        <input type="number" id="seed" value="42" />
+      </label>
+      <label><span data-i18n="actions.run_seconds">{{ i18n.actions.run_seconds }}</span>
+        <input type="number" id="runSec" min="0.1" max="60" step="0.1" value="2" />
+      </label>
+      <button id="btnStep" data-i18n="actions.step">{{ i18n.actions.step }}</button>
+      <button id="btnRun" class="primary" data-i18n="live_sim">{{ i18n.live_sim }}</button>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.safety19">{{ i18n.panels.safety19 }}</h2>
+      <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
+      <label><span data-i18n="fields.t_warn">{{ i18n.fields.t_warn }}</span>
+        <input type="number" id="tWarn" min="35" max="45" step="0.5" value="41" />
+      </label>
+      <label><span data-i18n="fields.t_off">{{ i18n.fields.t_off }}</span>
+        <input type="number" id="tOff" min="36" max="50" step="0.5" value="43" />
+      </label>
+      <label><span data-i18n="fields.motion_still_s">{{ i18n.fields.motion_still_s }}</span>
+        <input type="number" id="motionStill" min="0.5" max="10" step="0.1" value="2" />
+      </label>
+      <label><span data-i18n="fields.motion_eps">{{ i18n.fields.motion_eps }}</span>
+        <input type="number" id="motionEps" min="0.01" max="1" step="0.01" value="0.05" />
+      </label>
+      <label><span data-i18n="fields.bat_capacity">{{ i18n.fields.bat_capacity }}</span>
+        <input type="number" id="batCap" min="0.5" max="10" step="0.1" value="2.5" />
+      </label>
+    </section>
+
+    <section class="panel live">
+      <h2 data-i18n="panels.live">{{ i18n.panels.live }}</h2>
+      <div class="live-grid big">
+        <div><span data-i18n="fields.state">FSM</span>: <b id="vState">—</b></div>
+        <div><span data-i18n="fields.t_remaining">Rest</span>: <b id="vTrem">—</b></div>
+        <div><span data-i18n="fields.soc">SoC</span>: <b id="vSoc">—</b></div>
+        <div><span data-i18n="fields.t_piezo">T_piezo</span>: <b id="vTpiezo">—</b></div>
+        <div><span data-i18n="fields.t_skin">T_skin</span>: <b id="vTskin">—</b></div>
+        <div><span data-i18n="fields.i_sata_wcm2">I_SATA</span>: <b id="vIsata">—</b></div>
+      </div>
+    </section>
+
+    <section class="panel wide">
+      <h2 data-i18n="panels.plots">{{ i18n.panels.plots }}</h2>
+      <div class="charts">
+        <canvas id="chartIx"></canvas>
+        <canvas id="chartTx"></canvas>
+        <canvas id="chartDose"></canvas>
+        <canvas id="chartSoc"></canvas>
+        <canvas id="chartBurst"></canvas>
+        <canvas id="chartFsm"></canvas>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.selftest">{{ i18n.panels.selftest }}</h2>
+      <button id="btnSelftest" class="primary" data-i18n="actions.run_selftest">{{ i18n.actions.run_selftest }}</button>
+      <ul id="selftestList" class="anchors"></ul>
+    </section>
+
+    <section class="panel">
+      <h2 data-i18n="panels.export">{{ i18n.panels.export }}</h2>
+      <a id="btnCsv" class="button" href="/api/export/csv" data-i18n="actions.export_csv">CSV</a>
+      <button id="btnPng" data-i18n="actions.export_png">PNG</button>
+      <button id="btnSavePreset" data-i18n="actions.save_preset">{{ i18n.actions.save_preset }}</button>
+      <input type="file" id="presetFile" accept="application/json" />
+    </section>
+
+    <section class="panel wide">
+      <h2 data-i18n="panels.contraindications">{{ i18n.panels.contraindications }}</h2>
+      <p class="hint" data-i18n="contraindications.hint">{{ i18n.contraindications.hint }}</p>
+    </section>
+  </main>
+
+  <script>
+    window.__I18N__ = {{ i18n | tojson }};
+    window.__LANG__ = {{ lang | tojson }};
+  </script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

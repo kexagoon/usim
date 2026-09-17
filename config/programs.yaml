@@ -1,0 +1,253 @@
+# CALIBRATION_PRESET: I_set / mode / duration are simulator calibration,
+# NOT leaked factory firmware values.
+CALIBRATION_PRESET: true
+
+duty_map:
+  CONT: 1.0
+  PR_1_2: 0.3333333333   # RATIO_ON_OFF default
+  PR_1_5: 0.1666666667
+
+SKINOVA_10:
+  - id: 1
+    name: Anti-Aging
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 2
+    name: Couperose
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face, neck]
+  - id: 3
+    name: Skin improvement 1
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 4
+    name: Skin improvement 2
+    mode: CONT
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 5
+    name: Acne 1
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face]
+  - id: 6
+    name: Acne 2
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face]
+
+SKINOVA_19:
+  - id: 1
+    name: Acne
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face]
+  - id: 2
+    name: Anti-Aging
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 3
+    name: Fine Lines
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face]
+  - id: 4
+    name: Deep Wrinkles
+    mode: CONT
+    duration_s: 720
+    i_sata_w_cm2: 0.45
+    prf_hz: 100
+    zones: [face, neck]
+  - id: 5
+    name: Pores
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face]
+  - id: 6
+    name: Regeneration
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 7
+    name: Redness
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face]
+  - id: 8
+    name: Lifting
+    mode: CONT
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [face, neck]
+  - id: 9
+    name: Active Boost
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face]
+  - id: 10
+    name: Hydration
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face, neck, decollete]
+
+SKINOVA_MED:
+  # Cosmetic base (same as SKINOVA_10) + medical slots
+  - id: 1
+    name: Anti-Aging
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 2
+    name: Couperose
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face, neck]
+  - id: 3
+    name: Skin improvement 1
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 4
+    name: Skin improvement 2
+    mode: CONT
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [face, neck, decollete]
+  - id: 5
+    name: Acne 1
+    mode: PR_1_2
+    duration_s: 720
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face]
+  - id: 6
+    name: Acne 2
+    mode: PR_1_5
+    duration_s: 720
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face]
+  - id: 7
+    name: Ulcus cruris
+    mode: PR_1_5
+    duration_s: 720
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [leg]
+  - id: 8
+    name: Eczema
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [body]
+  - id: 9
+    name: Perioral dermatitis
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.25
+    prf_hz: 100
+    zones: [face]
+  - id: 10
+    name: Arthritis
+    mode: CONT
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [joint]
+  - id: 11
+    name: Gonitis
+    mode: CONT
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [knee]
+  - id: 12
+    name: Bursitis
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [joint]
+  - id: 13
+    name: Epicondylitis
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [elbow]
+  - id: 14
+    name: Hematoma
+    mode: PR_1_5
+    duration_s: 720
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [body]
+  - id: 15
+    name: Muscle stiffness
+    mode: CONT
+    duration_s: 720
+    i_sata_w_cm2: 0.40
+    prf_hz: 100
+    zones: [body]
+  - id: 16
+    name: Tendonitis
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [joint]
+  - id: 17
+    name: Carpal tunnel
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [wrist]
+  - id: 18
+    name: Scar
+    mode: PR_1_5
+    duration_s: 720
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [body]

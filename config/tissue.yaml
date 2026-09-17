@@ -1,0 +1,70 @@
+# Soft-tissue acoustic / thermal stack (model parameters)
+c_tissue_m_s: 1540
+rho_tissue_kg_m3: 1050
+z_tissue_mrayl: 1.62
+
+layers:
+  - name: gel
+    thickness_m: 0.0003
+    rho: 1000
+    c: 1480
+    alpha0_np_m_mhz: 2.0
+    k_thermal: 0.6
+    c_heat: 4180
+    wb: 0.0
+  - name: stratum_corneum
+    thickness_m: 0.00002
+    rho: 1100
+    c: 1500
+    alpha0_np_m_mhz: 40.0
+    k_thermal: 0.37
+    c_heat: 3600
+    wb: 0.0
+  - name: epidermis
+    thickness_m: 0.00008
+    rho: 1100
+    c: 1540
+    alpha0_np_m_mhz: 20.0
+    k_thermal: 0.37
+    c_heat: 3600
+    wb: 0.0
+  - name: dermis
+    thickness_m: 0.0020
+    rho: 1080
+    c: 1580
+    alpha0_np_m_mhz: 12.0
+    k_thermal: 0.40
+    c_heat: 3400
+    wb: 0.0005
+  - name: hypodermis
+    thickness_m: 0.0040
+    rho: 900
+    c: 1450
+    alpha0_np_m_mhz: 6.0
+    k_thermal: 0.25
+    c_heat: 2300
+    wb: 0.0002
+
+blood:
+  rho_b: 1050
+  c_b: 3617
+  t_b_c: 37.0
+
+q_met_w_m3: 500
+
+alpha_power_n: 1.2
+
+# Acoustic stack materials (PZT → glue → Ti → gel → skin)
+stack_layers:
+  - name: pzt
+    z_mrayl: 32.0
+    thickness_m: 0.0002
+    c: 4000
+  - name: glue
+    z_mrayl: 2.5
+    thickness_m: 0.00001
+    c: 2000
+  - name: titanium
+    z_mrayl: 27.0
+    thickness_m: 0.0003
+    c: 6100

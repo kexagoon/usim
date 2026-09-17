@@ -1,0 +1,82 @@
+# Hard manufacturer data + calibration defaults (not factory firmware)
+station:
+  dimensions_mm: [235, 115, 165]
+  mass_kg: 0.7
+  voltage_v: [100, 240]
+  voltage_tol_pct: 10
+  frequency_hz: [50, 60]
+  power_va: 18  # Skinova 19; older Skinova ~20 VA
+  protection_class: II
+
+sonotrode:
+  length_mm: 210
+  diameter_max_mm: 29
+  mass_g: 250
+  era_cm2: 3.0
+  face_material: titanium
+  face_coating_19: PVD
+  i_max_w_cm2: 0.5
+  p_ac_max_w: 1.5
+  t_prog_max_s: 720  # 12 min
+
+models:
+  SKINOVA_10:
+    f0_hz: 10000000
+    frequencies_allowed: [10000000]
+    modes: [CONT, PR_1_2]
+    sensors: []
+    article_set1: "720-50"
+    article_sonotrode: "720-00"
+  SKINOVA_MED:
+    f0_hz: 10000000
+    frequencies_allowed: [10000000]
+    modes: [CONT, PR_1_2, PR_1_5]
+    sensors: []
+    article_set1: "720-50"
+  SKINOVA_19:
+    f0_hz: 19000000
+    frequencies_allowed: [19000000]
+    modes: [CONT, PR_1_2]
+    sensors: [NTC, IMU]
+    article_set1: "790-50"
+    article_sonotrode: "790-00"
+    t_warn_c: 41.0   # CALIBRATION — not factory datasheet
+    t_off_c: 43.0    # CALIBRATION
+    motion_still_s: 2.0
+    motion_eps_m_s2: 0.05
+
+battery:
+  capacity_wh: 2.5   # CALIBRATION default
+  v_nominal: 3.7
+  v_cut: 3.2
+  eta_label: "calibration, not datasheet"
+
+piezo:
+  type: PZT-8
+  c0_nF: 1.5
+  k_eff2: 0.4
+  q_m_air: 120
+  q_m_gel: 25
+  stack_efficiency: 0.65  # 0.5–0.8
+
+driver:
+  vdrive_peak_v: 40.0
+  eta_elec: 0.7
+  limit_domain: SATA  # SATA | SAPA
+
+duty_interpretation: RATIO_ON_OFF  # RATIO_ON_OFF | ON_OVER_PERIOD
+# RATIO_ON_OFF: 1:2 → D=1/3, 1:5 → D=1/6
+# ON_OVER_PERIOD: 1:2 → D=1/2, 1:5 → D=1/5
+
+prf_hz_default: 100
+prf_hz_range: [50, 1000]
+
+half_value_depth_m:
+  "10000000": 0.003   # 3 mm @ 10 MHz (Wellcomet claim)
+  "19000000": 0.0015  # 1.5 mm @ 19 MHz
+
+thermal_piezo:
+  c_th_j_per_k: 8.0
+  r_th_k_per_w: 12.0
+  h_gel_w_per_k: 0.8
+  t_amb_c: 25.0
