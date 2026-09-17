@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: skinova-wellcomet-simulator
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: HOST
+        value: 0.0.0.0

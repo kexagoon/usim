@@ -91,3 +91,23 @@ Herstellerlimits (unveränderlich in der Logik): I_max=0,5 W/cm² SATA, P_ac_max
 ## Spezifikation
 
 Hintergrund (RU): `SPEC_RU.txt`. Liefernotiz: `DELIVERY.md`.
+
+
+## Online-Deploy (permanente URL)
+
+GitHub speichert nur den Code. Für eine permanente Web-URL (Handy/PC überall):
+
+1. Bei [Render](https://render.com) anmelden (kostenloser Plan).
+2. **New → Blueprint** und dieses Repository verbinden (`kexagoon/usim`).
+3. `render.yaml` erzeugt den Web-Service automatisch.
+4. Nach dem Deploy: URL wie `https://skinova-wellcomet-simulator.onrender.com`.
+
+Hinweis: Der Free-Plan schläft nach Idle ein; der erste Aufruf kann 30–60 s dauern.
+
+Docker lokal:
+
+```bash
+docker build -t skinova-sim .
+docker run --rm -p 8765:8765 skinova-sim
+```
+
