@@ -1,14 +1,17 @@
-"""Acoustic bowl (чаша): transmission, glue sensitivity, air load."""
+"""Acoustic bowl (чаша): transmission, glue sensitivity, air load, multi-f0."""
 
 from __future__ import annotations
 
 from src.acoustic_bowl import (
     AcousticBowl,
+    apply_named_preset,
     bowl_params_from_dict,
+    compare_bowl_presets,
     default_bowl_params,
     era_equivalent_diameter_m,
     suggested_piezo_thickness,
 )
+from src.frequencies import ALLOWED_F0_HZ, half_value_depth_m, validate_f0, wavelength_m
 from src.propagation import alpha_from_half_value, intensity_at_depth
 
 
@@ -18,8 +21,14 @@ def test_era_equivalent_diameter():
 
 
 def test_suggested_piezo_thickness_half_wave():
-    h = suggested_piezo_thickness(19e6, 4200.0)
-    assert abs(h - 4200.0 / (2 * 19e6)) < 1e-12
+    for f0 in sorted(ALLOWED_F0_HZ):
+        h = suggested_piezo_thickness(f0, 4200.0)
+        assert abs(h - 4200.0 / (2 * f0)) < 1e-12
+
+
+def test_wavelength_scales_with_f0():
+    assert abs(wavelength_m(1e6) - 1.54e-3) < 1e-9
+    assert abs(wavelength_m(19e6) - 1540.0 / 19e6) < 1e-12
 
 
 def test_air_load_zero_transmission_and_radiation():
@@ -33,6 +42,28 @@ def test_air_load_zero_transmission_and_radiation():
     assert e.p_radiated_w == 0.0
     assert e.efficiency == 0.0
     assert e.p_piezo_heat_w > 0.5 * e.p_drive_w
+
+
+def test_air_load_zero_at_1_and_3_mhz():
+    for f0 in (1e6, 3e6):
+        p = bowl_params_from_dict({"f0_hz": f0, "load": "air"})
+        assert p.f0_hz == f0
+        bowl = AcousticBowl(p)
+        assert bowl.transmission_reflection(f0)[0] == 0.0
+        assert bowl.energy_partition().p_radiated_w == 0.0
+
+
+def test_gel_tissue_nonzero_at_all_allowed_f0():
+    for f0 in sorted(ALLOWED_F0_HZ):
+        p = bowl_params_from_dict({"f0_hz": f0, "load": "gel_tissue"})
+        bowl = AcousticBowl(p)
+        t, r, zin = bowl.transmission_reflection(f0)
+        assert t >= 0.0
+        assert r >= 0.0
+        assert abs(zin) > 0.0
+        e = bowl.energy_partition()
+        assert e.p_radiated_w >= 0.0
+        assert e.p_radiated_w <= 1.5 + 1e-9
 
 
 def test_gel_tissue_nonzero_transmission():
@@ -64,17 +95,42 @@ def test_ti_sweep_resonance_shift_present():
     assert max(sw["resonance_shift_hz"]) != min(sw["resonance_shift_hz"])
 
 
-def test_spectrum_and_analyze_api_shape():
+def test_piezo_diameter_sweep():
+    bowl = AcousticBowl(default_bowl_params())
+    sw = bowl.sweep_piezo_diameter(n=8)
+    assert len(sw["piezo_diameter_mm"]) == 8
+    assert sw["p_ac_w"][-1] >= sw["p_ac_w"][0] - 1e-9
+
+
+def test_f0_compare_bar():
+    bowl = AcousticBowl(default_bowl_params())
+    cmp_ = bowl.compare_frequencies()
+    assert len(cmp_["rows"]) == 4
+    mhz = {r["f0_mhz"] for r in cmp_["rows"]}
+    assert mhz == {1.0, 3.0, 10.0, 19.0}
+
+
+def test_spectrum_phase_and_analyze_api_shape():
     bowl = AcousticBowl(default_bowl_params())
     spec = bowl.spectrum(n=41)
     assert len(spec) == 41
-    assert all(hasattr(pt, "t_intensity") for pt in spec)
+    assert all(hasattr(pt, "t_phase_rad") for pt in spec)
     d = bowl.to_api_dict()
     assert d["calibration"] is True
     assert "energy" in d and "layers" in d
+    assert "time_of_flight" in d
     anchors = d["anchors"]
-    assert anchors.get("era_cm2") == 3.0 or anchors.get("era_cm2") == 3.0
-    assert anchors.get("p_ac_max_w") == 1.5 or anchors.get("p_ac_max_w") == 1.5
+    assert anchors.get("era_cm2") == 3.0
+    assert anchors.get("p_ac_max_w") == 1.5
+    assert set(anchors.get("allowed_f0_hz")) == set(ALLOWED_F0_HZ)
+
+
+def test_depth_profile_and_tof():
+    bowl = AcousticBowl(default_bowl_params())
+    prof = bowl.depth_profile(n_per_layer=8)
+    assert len(prof["z_mm"]) > 10
+    tof = bowl.time_of_flight()
+    assert tof["total_ns"] > 0
 
 
 def test_near_field_map_shape():
@@ -88,9 +144,11 @@ def test_near_field_map_shape():
 
 
 def test_half_value_depth_anchor_still_holds():
-    for xh in (0.003, 0.0015):
+    for xh in (0.003, 0.0015, 0.030, 0.010):
         a = alpha_from_half_value(xh)
         assert abs(intensity_at_depth(0.5, a, xh) - 0.25) < 1e-12
+    assert abs(half_value_depth_m(10e6) - 0.003) < 1e-12
+    assert abs(half_value_depth_m(1e6) - 0.030) < 1e-12
 
 
 def test_piezo_diameter_clamped_to_face():
@@ -99,3 +157,33 @@ def test_piezo_diameter_clamped_to_face():
         default_bowl_params(),
     )
     assert p.piezo_diameter_m <= p.ti_diameter_m
+
+
+def test_invalid_f0_snaps_to_allowed():
+    p = bowl_params_from_dict({"f0_hz": 12e6})
+    assert p.f0_hz in ALLOWED_F0_HZ
+    assert validate_f0(1e6) == 1e6
+
+
+def test_presets_and_compare():
+    p = apply_named_preset("thin_glue")
+    assert p.glue_thickness_m <= 5e-6
+    p19 = apply_named_preset("skinova_19")
+    assert p19.f0_hz == 19e6
+    cmp_ = compare_bowl_presets(
+        {"f0_hz": 10e6, "glue_thickness_m": 2e-6},
+        {"f0_hz": 10e6, "glue_thickness_m": 40e-6},
+    )
+    assert "delta" in cmp_
+    assert cmp_["delta"]["p_radiated_w"] < 0
+
+
+def test_matching_and_backing_layers():
+    p = bowl_params_from_dict(
+        {"matching_enabled": True, "backing": "heavy", "load": "water"}
+    )
+    bowl = AcousticBowl(p)
+    names = [ly.name for ly in bowl.build_layers()]
+    assert "matching" in names
+    assert "backing" in names
+    assert "water" in names

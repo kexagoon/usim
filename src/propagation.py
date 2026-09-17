@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.frequencies import half_value_depth_m as hv_default
+
 C_TISSUE = 1540.0  # m/s
 RHO_TISSUE = 1050.0  # kg/m³
 
@@ -69,8 +71,8 @@ class Propagation:
         self.rho = rho
         self.enable_2d = enable_2d
         if x_half_m is None:
-            # Wellcomet claims
-            x_half_m = 0.003 if f_hz < 15e6 else 0.0015
+            # 10/19 manufacturer-ish; 1/3 calib α∝f (see frequencies.HALF_VALUE_DEPTH_M)
+            x_half_m = hv_default(f_hz)
         self.x_half_m = x_half_m
         self.alpha = alpha_from_half_value(x_half_m)
 

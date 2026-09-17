@@ -12,7 +12,7 @@ Desktop-first UI polish plus a new **Akustik-Schale** tab backed by a multilayer
 ### Immutable manufacturer anchors
 - ERA = 3.0 cm² → d_eq ≈ 19.54 mm
 - I_max = 0.5 W/cm² SATA, P_ac_max = 1.5 W
-- f0 ∈ {10, 19} MHz (home)
+- Allowed sim f0 ∈ {1, 3, 10, 19} MHz; home defaults still 10/19 (see DELIVERY_FREQ.md)
 - Face: titanium (+ PVD on 19)
 - Tissue c = 1540 m/s; gel Z ≈ 1.5 MRayl; air Z ≈ 400 Rayl
 

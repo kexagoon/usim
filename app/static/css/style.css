@@ -271,3 +271,65 @@ button:active { transform: translateY(1px); }
   .bowl-controls { position: static; max-height: none; grid-column: 1 / -1; }
   .bowl-viz, .bowl-chart.wide { grid-column: 1 / -1; }
 }
+
+/* Frequency chips + presets + collapsible bowl controls */
+.freq-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0.4rem 0 0.6rem; }
+.freq-chips .chip {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-weight: 700;
+  min-width: 2.4rem;
+  cursor: pointer;
+}
+.freq-chips .chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.chip-unit { color: var(--muted); font-size: 0.85rem; margin-left: 0.2rem; }
+.hidden-select { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.preset-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
+.preset-btn {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+.collapsible {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.35rem 0.55rem 0.55rem;
+  margin-bottom: 0.55rem;
+  background: var(--panel-2);
+}
+.collapsible > summary {
+  cursor: pointer;
+  font-weight: 650;
+  padding: 0.25rem 0.15rem;
+  color: var(--accent2);
+  list-style: none;
+}
+.collapsible > summary::-webkit-details-marker { display: none; }
+.collapsible > summary::before { content: "▸ "; }
+.collapsible[open] > summary::before { content: "▾ "; }
+.compare-out {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+.bowl-controls { width: min(340px, 100%); }
+.bowl-grid { grid-template-columns: 340px 1fr 1fr; }
+.chart-wrap.tall { height: 340px; }
+.hint { color: var(--muted); font-size: 0.82rem; margin: 0.25rem 0 0.5rem; }

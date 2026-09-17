@@ -18,6 +18,13 @@ from src.operator_motion import OperatorMotion
 from src.piezo_bvd import BVDParams, PiezoBVD
 from src.propagation import Propagation
 from src.station import ProgramBlob, Station
+from src.frequencies import (
+    ALLOWED_F0_HZ,
+    half_value_depth_m,
+    suggested_piezo_thickness_m,
+    validate_f0,
+    wavelength_m,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "config"
@@ -79,6 +86,7 @@ class SimulationConfig:
     c0_nF: float = 1.5
     motion_still_s: float = 2.0
     motion_eps: float = 0.05
+    f0_hz_override: float | None = None  # sim-allowed {1,3,10,19} MHz
 
 
 class Simulation:
@@ -93,13 +101,18 @@ class Simulation:
 
         model = self.cfg.model
         model_cfg = self.devices["models"][model]
-        self.f0 = float(model_cfg["f0_hz"])
+        default_f0 = float(model_cfg["f0_hz"])
+        if self.cfg.f0_hz_override is not None:
+            self.f0 = validate_f0(float(self.cfg.f0_hz_override))
+        else:
+            self.f0 = validate_f0(default_f0)
+        self.f0_default_hz = default_f0
         era_cm2 = float(self.devices["sonotrode"]["era_cm2"])
         self.era_cm2 = era_cm2
         self.era_m2 = era_cm2 * 1e-4
 
         x_half_map = self.devices.get("half_value_depth_m", {})
-        self.x_half = float(x_half_map.get(str(int(self.f0)), 0.003 if self.f0 < 15e6 else 0.0015))
+        self.x_half = half_value_depth_m(self.f0, x_half_map)
 
         piezo_cfg = self.devices["piezo"]
         self.piezo = PiezoBVD(
@@ -124,7 +137,7 @@ class Simulation:
                 p_ac_max_w=float(self.devices["sonotrode"]["p_ac_max_w"]),
             )
         )
-        h_pzt = 0.0002 if self.f0 < 15e6 else 0.000105
+        h_pzt = suggested_piezo_thickness_m(self.f0)
         self.stack = AcousticStack.default(h_pzt)
         self.stack.stack_efficiency = self.cfg.stack_efficiency
         self.stack.gel_present = self.cfg.gel_present
@@ -397,6 +410,12 @@ class Simulation:
         return {
             "model": self.cfg.model,
             "f0_hz": self.f0,
+            "f0_default_hz": self.f0_default_hz,
+            "allowed_f0_hz": sorted(ALLOWED_F0_HZ),
+            "f0_hint": (
+                "1/3 MHz are clinical/LDM-class simulation options; "
+                "home firmware defaults remain 10/19 MHz."
+            ),
             "state": self.fsm.state.value,
             "nvm": self.fsm.nvm.to_dict(),
             "soc": self.soc,

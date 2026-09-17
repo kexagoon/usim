@@ -100,6 +100,7 @@
       motion_still_s: parseFloat($("motionStill").value),
       motion_eps: parseFloat($("motionEps").value),
       bat_capacity_wh: parseFloat($("batCap").value),
+      f0_hz: parseFloat($("f0Select").value),
     };
   }
 
@@ -174,6 +175,7 @@
     function set(id, v) { const el = $(id); if (el) el.textContent = v; }
     set("vState", data.state || "—");
     set("vF0", data.f0_hz ? (data.f0_hz / 1e6).toFixed(0) + " MHz" : "—");
+    if (data.f0_hz && $("f0Select")) $("f0Select").value = String(Math.round(data.f0_hz));
     set("vLam", data.lambda_m ? (data.lambda_m * 1e3).toFixed(3) + " mm" : "—");
     set("vZn", data.z_n_m ? (data.z_n_m * 1e3).toFixed(1) + " mm" : "—");
     if ($("xHalf")) $("xHalf").value = data.x_half_m ? (data.x_half_m * 1e3).toFixed(2) + " mm" : "—";
@@ -212,13 +214,50 @@
       load: $("bowlLoad").value,
       piezo_material: $("bowlPiezoMat").value,
       glue_material: $("bowlGlueMat").value,
+      face_material: $("bowlFaceMat").value,
       ti_thickness_m: parseFloat($("bowlTiH").value) * 1e-3,
       ti_diameter_m: parseFloat($("bowlTiD").value) * 1e-3,
       piezo_thickness_m: auto || piezoH === "" ? null : parseFloat(piezoH) * 1e-3,
       piezo_diameter_m: parseFloat($("bowlPiezoD").value) * 1e-3,
       glue_thickness_m: parseFloat($("bowlGlueH").value) * 1e-6,
       gel_thickness_m: parseFloat($("bowlGelH").value) * 1e-3,
+      matching_enabled: $("bowlMatchEn").checked,
+      matching_material: $("bowlMatchMat").value,
+      matching_thickness_m: parseFloat($("bowlMatchH").value) * 1e-6,
+      backing: $("bowlBacking").value,
+      kt: parseFloat($("bowlKt").value),
+      spectrum_span: parseFloat($("bowlSpan").value),
     };
+  }
+
+  function syncBowlFreqChips() {
+    const v = $("bowlF0").value;
+    document.querySelectorAll("#bowlFreqChips .chip").forEach((c) => {
+      c.classList.toggle("active", c.dataset.f0 === v);
+    });
+  }
+
+  function applyBowlParamsToForm(p) {
+    if (!p) return;
+    $("bowlF0").value = String(Math.round(p.f0_hz || 19e6));
+    syncBowlFreqChips();
+    $("bowlDrive").value = p.drive_level ?? 1;
+    $("bowlDriveVal").textContent = Number(p.drive_level ?? 1).toFixed(2);
+    $("bowlLoad").value = p.load || "gel_tissue";
+    $("bowlPiezoMat").value = p.piezo_material || "pzt8";
+    $("bowlGlueMat").value = p.glue_material || "glue_epoxy";
+    if ($("bowlFaceMat")) $("bowlFaceMat").value = p.face_material || "titanium";
+    $("bowlTiH").value = ((p.ti_thickness_m || 3e-4) * 1e3).toFixed(2);
+    $("bowlTiD").value = ((p.ti_diameter_m || 0.01954) * 1e3).toFixed(2);
+    $("bowlPiezoD").value = ((p.piezo_diameter_m || 0.018) * 1e3).toFixed(1);
+    $("bowlGlueH").value = ((p.glue_thickness_m || 1e-5) * 1e6).toFixed(0);
+    $("bowlGelH").value = ((p.gel_thickness_m || 3e-4) * 1e3).toFixed(2);
+    if ($("bowlMatchEn")) $("bowlMatchEn").checked = !!p.matching_enabled;
+    if ($("bowlMatchMat") && p.matching_material) $("bowlMatchMat").value = p.matching_material;
+    if ($("bowlMatchH") && p.matching_thickness_m != null) $("bowlMatchH").value = (p.matching_thickness_m * 1e6).toFixed(0);
+    if ($("bowlBacking")) $("bowlBacking").value = p.backing || "air";
+    if ($("bowlKt") && p.kt != null) $("bowlKt").value = p.kt;
+    if ($("bowlSpan") && p.spectrum_span != null) $("bowlSpan").value = p.spectrum_span;
   }
 
   function ensureBowl() {
@@ -258,8 +297,42 @@
       bowlCharts.field.options.scales.y.title.text = "I (W/cm²)";
       bowlCharts.field.options.plugins.legend.display = false;
     }
+    bowlCharts.dia = lineChart("chartBowlDia", "P_ac", "#2dd4a8");
+    if (bowlCharts.dia) {
+      bowlCharts.dia.data.datasets.push({ label: "I", data: [], borderColor: "#ffd866", borderWidth: 2, pointRadius: 0, backgroundColor: "transparent", yAxisID: "y1" });
+      bowlCharts.dia.options.scales.y1 = { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "I (W/cm²)" } };
+      bowlCharts.dia.options.scales.x.title.text = "Ø (mm)";
+      bowlCharts.dia.options.scales.y.title.text = "P_ac (W)";
+    }
+    bowlCharts.f0 = new Chart($("chartBowlF0"), {
+      type: "bar",
+      data: { labels: [], datasets: [
+        { label: "P_ac", data: [], backgroundColor: "#2dd4a8" },
+        { label: "η", data: [], backgroundColor: "#c084fc", yAxisID: "y1" },
+      ]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { title: { display: true, text: "P_ac (W)" }, grid: { color: Chart.defaults.borderColor } },
+          y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η" } },
+          x: { title: { display: true, text: "f0 (MHz)" } },
+        },
+      },
+    });
+    bowlCharts.profile = lineChart("chartBowlProfile", "|p|", "#e6a817");
+    if (bowlCharts.profile) {
+      bowlCharts.profile.options.scales.x.title.text = "z (mm)";
+      bowlCharts.profile.options.scales.y.title.text = "|p| (Pa)";
+    }
+    bowlCharts.phase = lineChart("chartBowlPhase", "∠Z", "#3b9eff");
+    if (bowlCharts.phase) {
+      bowlCharts.phase.data.datasets.push({ label: "∠T", data: [], borderColor: "#f07178", borderWidth: 2, pointRadius: 0, backgroundColor: "transparent" });
+      bowlCharts.phase.options.scales.x.title.text = "f (MHz)";
+      bowlCharts.phase.options.scales.y.title.text = "phase (rad)";
+    }
     bowlInited = true;
     labelBowl();
+    syncBowlFreqChips();
   }
 
   function labelBowl() {
@@ -313,6 +386,8 @@
     $("bowlShift").textContent = ((result.resonance_shift_hz || 0) / 1e3).toFixed(1) + " kHz";
     $("bowlPac").textContent = (energy.p_radiated_w ?? 0).toFixed(3) + " W";
     $("bowlEta").textContent = ((energy.efficiency ?? 0) * 100).toFixed(1) + " %";
+    if ($("bowlTof") && result.time_of_flight) $("bowlTof").textContent = (result.time_of_flight.total_ns || 0).toFixed(1) + " ns";
+    if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
     drawSchematic(result.layers || []);
     if (bowlCharts.energy) {
       bowlCharts.energy.data.datasets[0].data = [
@@ -320,7 +395,8 @@
       ];
       bowlCharts.energy.update();
     }
-    const spec = await (await fetch("/api/bowl/spectrum?n=161")).json();
+    const span = parseFloat($("bowlSpan") ? $("bowlSpan").value : 0.15);
+    const spec = await (await fetch("/api/bowl/spectrum?n=161&span=" + span)).json();
     if (bowlCharts.spectrum) {
       bowlCharts.spectrum.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
       bowlCharts.spectrum.data.datasets[0].data = spec.t_intensity || [];
@@ -329,6 +405,12 @@
       const zMax = Math.max(...z, 1e-9);
       bowlCharts.spectrum.data.datasets[2].data = z.map((v) => v / zMax);
       bowlCharts.spectrum.update();
+    }
+    if (bowlCharts.phase) {
+      bowlCharts.phase.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
+      bowlCharts.phase.data.datasets[0].data = spec.z_in_phase_rad || [];
+      bowlCharts.phase.data.datasets[1].data = spec.t_phase_rad || [];
+      bowlCharts.phase.update();
     }
     const glue = await postJSON("/api/bowl/sweep", { kind: "glue", n: 36 });
     if (bowlCharts.glue) {
@@ -350,26 +432,58 @@
       bowlCharts.field.data.datasets[0].data = field.i_w_cm2[0] || [];
       bowlCharts.field.update();
     }
+    const dia = await postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 });
+    if (bowlCharts.dia) {
+      bowlCharts.dia.data.labels = (dia.piezo_diameter_mm || []).map((v) => Number(v).toFixed(1));
+      bowlCharts.dia.data.datasets[0].data = dia.p_ac_w || [];
+      bowlCharts.dia.data.datasets[1].data = dia.i_sata_w_cm2 || [];
+      bowlCharts.dia.update();
+    }
+    const f0c = await postJSON("/api/bowl/sweep", { kind: "f0", n: 4 });
+    if (bowlCharts.f0 && f0c.rows) {
+      bowlCharts.f0.data.labels = f0c.rows.map((r) => String(r.f0_mhz));
+      bowlCharts.f0.data.datasets[0].data = f0c.rows.map((r) => r.p_ac_w);
+      bowlCharts.f0.data.datasets[1].data = f0c.rows.map((r) => r.efficiency);
+      bowlCharts.f0.update();
+    }
+    const prof = await (await fetch("/api/bowl/profile?n_per_layer=16")).json();
+    if (bowlCharts.profile) {
+      bowlCharts.profile.data.labels = (prof.z_mm || []).map((v) => Number(v).toFixed(2));
+      bowlCharts.profile.data.datasets[0].data = prof.pressure_abs || [];
+      bowlCharts.profile.update();
+    }
   }
 
   async function resetBowl() {
     const data = await (await fetch("/api/bowl/params")).json();
-    const p = data.params || {};
-    $("bowlF0").value = String(Math.round(p.f0_hz || 19e6));
-    $("bowlDrive").value = p.drive_level ?? 1;
-    $("bowlDriveVal").textContent = Number(p.drive_level ?? 1).toFixed(2);
-    $("bowlLoad").value = p.load || "gel_tissue";
-    $("bowlPiezoMat").value = p.piezo_material || "pzt8";
-    $("bowlGlueMat").value = p.glue_material || "glue_epoxy";
-    $("bowlTiH").value = ((p.ti_thickness_m || 3e-4) * 1e3).toFixed(2);
-    $("bowlTiD").value = ((p.ti_diameter_m || 0.01954) * 1e3).toFixed(2);
+    applyBowlParamsToForm(data.params || {});
     $("bowlPiezoAuto").checked = true;
     $("bowlPiezoH").value = "";
     $("bowlPiezoH").disabled = true;
-    $("bowlPiezoD").value = ((p.piezo_diameter_m || 0.018) * 1e3).toFixed(1);
-    $("bowlGlueH").value = ((p.glue_thickness_m || 1e-5) * 1e6).toFixed(0);
-    $("bowlGelH").value = ((p.gel_thickness_m || 3e-4) * 1e3).toFixed(2);
     await analyzeBowl();
+  }
+
+  async function loadBowlPreset(name) {
+    const posted = await postJSON("/api/bowl/preset", { name });
+    applyBowlParamsToForm(posted.params || {});
+    $("bowlPiezoAuto").checked = posted.params && posted.params.piezo_thickness_m == null;
+    await analyzeBowl();
+  }
+
+  async function runBowlCompare() {
+    const help = (await (await fetch("/api/bowl/params")).json()).help || {};
+    const defs = help.preset_defs || {};
+    const aName = $("bowlCmpA").value;
+    const bName = $("bowlCmpB").value;
+    const cmp = await postJSON("/api/bowl/compare", { a: defs[aName] || { f0_hz: 19e6 }, b: defs[bName] || { f0_hz: 10e6 } });
+    const d = cmp.delta || {};
+    $("bowlCompareOut").textContent = JSON.stringify({
+      a: aName, b: bName,
+      dP_ac: (d.p_radiated_w || 0).toFixed(4),
+      dEta: (d.efficiency || 0).toFixed(4),
+      dT: (d.t_at_f0 || 0).toFixed(5),
+      dFres_kHz: ((d.resonance_hz || 0) / 1e3).toFixed(2),
+    }, null, 2);
   }
 
   // events
@@ -434,6 +548,14 @@
   $("bowlPiezoAuto").addEventListener("change", (e) => { $("bowlPiezoH").disabled = e.target.checked; });
   $("btnBowlAnalyze").addEventListener("click", analyzeBowl);
   $("btnBowlReset").addEventListener("click", resetBowl);
+  document.querySelectorAll("#bowlFreqChips .chip").forEach((c) => c.addEventListener("click", () => {
+    $("bowlF0").value = c.dataset.f0;
+    syncBowlFreqChips();
+    analyzeBowl();
+  }));
+  document.querySelectorAll("#bowlPresets .preset-btn").forEach((b) => b.addEventListener("click", () => loadBowlPreset(b.dataset.preset)));
+  if ($("btnBowlCompare")) $("btnBowlCompare").addEventListener("click", runBowlCompare);
+  if ($("f0Select")) $("f0Select").addEventListener("change", applySettings);
 
   document.documentElement.setAttribute("data-theme", localStorage.getItem(THEME_KEY) || "dark");
   $("bowlPiezoH").disabled = true;

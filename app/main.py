@@ -19,10 +19,13 @@ from src.i18n import all_strings, list_langs
 from src.simulation import Simulation, SimulationConfig
 from src.acoustic_bowl import (
     AcousticBowl,
+    apply_named_preset,
     bowl_params_from_dict,
+    compare_bowl_presets,
     default_bowl_params,
     params_help,
 )
+from src.frequencies import ALLOWED_F0_HZ, frequency_policy_dict, validate_f0
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = Path(__file__).resolve().parent
@@ -67,6 +70,7 @@ class SettingsIn(BaseModel):
     dt_macro_s: float | None = None
     seed: int | None = None
     enable_2d: bool | None = None
+    f0_hz: float | None = None  # allowed {1,3,10,19}e6
 
 
 class RunIn(BaseModel):
@@ -178,6 +182,9 @@ async def api_settings(body: SettingsIn) -> dict[str, Any]:
         sim.set_path(body.path)
     if body.gel_present is not None:
         sim.set_gel(body.gel_present)
+    if body.f0_hz is not None:
+        cfg.f0_hz_override = validate_f0(float(body.f0_hz))
+        rebuild = True
 
     if rebuild:
         pid = body.program_id or (sim.fsm.nvm.program_id or 1)
@@ -320,13 +327,26 @@ class BowlParamsIn(BaseModel):
     load: str | None = None
     piezo_material: str | None = None
     glue_material: str | None = None
+    face_material: str | None = None
     ti_thickness_m: float | None = None
     ti_diameter_m: float | None = None
     piezo_thickness_m: float | None = None
     piezo_diameter_m: float | None = None
     glue_thickness_m: float | None = None
     gel_thickness_m: float | None = None
+    matching_enabled: bool | None = None
+    matching_material: str | None = None
+    matching_thickness_m: float | None = None
+    backing: str | None = None
     era_cm2: float | None = None
+    stack_efficiency: float | None = None
+    kt: float | None = None
+    spectrum_span: float | None = None
+    piezo_rho: float | None = None
+    piezo_c: float | None = None
+    piezo_z_mrayl: float | None = None
+    face_z_mrayl: float | None = None
+    load_z_mrayl: float | None = None
 
 
 def _get_bowl() -> AcousticBowl:
@@ -365,10 +385,12 @@ async def api_bowl_spectrum(
 ) -> dict[str, Any]:
     bowl = _get_bowl()
     f0 = bowl.params.f0_hz
+    bowl.params.spectrum_span = span
     spec = bowl.spectrum(f0 * (1 - span), f0 * (1 + span), n=n)
     return {
         "calibration": True,
         "f0_hz": f0,
+        "span": span,
         "resonance_hz": bowl.find_resonance(spec),
         "f_hz": [p.f_hz for p in spec],
         "t_intensity": [p.t_intensity for p in spec],
@@ -376,11 +398,13 @@ async def api_bowl_spectrum(
         "z_in_mag": [p.z_in_mag for p in spec],
         "z_in_real": [p.z_in_real for p in spec],
         "z_in_imag": [p.z_in_imag for p in spec],
+        "z_in_phase_rad": [p.z_in_phase_rad for p in spec],
+        "t_phase_rad": [p.t_phase_rad for p in spec],
     }
 
 
 class BowlSweepIn(BaseModel):
-    kind: str = "glue"  # glue | titanium
+    kind: str = "glue"  # glue | titanium | piezo_diameter | f0
     n: int = Field(40, ge=5, le=200)
     h_min_m: float | None = None
     h_max_m: float | None = None
@@ -395,6 +419,14 @@ async def api_bowl_sweep(body: BowlSweepIn) -> dict[str, Any]:
         h_max = body.h_max_m if body.h_max_m is not None else 50e-6
         data = bowl.sweep_glue(h_min, h_max, n=body.n)
         data["kind"] = "glue"
+    elif kind in ("piezo_diameter", "piezo_d", "diameter"):
+        d_min = body.h_min_m if body.h_min_m is not None else 0.010
+        d_max = body.h_max_m if body.h_max_m is not None else None
+        data = bowl.sweep_piezo_diameter(d_min, d_max, n=body.n)
+        data["kind"] = "piezo_diameter"
+    elif kind in ("f0", "frequency", "freq"):
+        data = bowl.compare_frequencies()
+        data["kind"] = "f0"
     else:
         h_min = body.h_min_m if body.h_min_m is not None else 1e-4
         h_max = body.h_max_m if body.h_max_m is not None else 1e-3
@@ -420,6 +452,48 @@ async def api_bowl_field(
 @app.get("/api/bowl/analyze")
 async def api_bowl_analyze() -> dict[str, Any]:
     return _get_bowl().to_api_dict()
+
+
+@app.get("/api/bowl/profile")
+async def api_bowl_profile(n_per_layer: int = Query(20, ge=4, le=80)) -> dict[str, Any]:
+    bowl = _get_bowl()
+    data = bowl.depth_profile(n_per_layer=n_per_layer)
+    data["calibration"] = True
+    data["time_of_flight"] = bowl.time_of_flight()
+    return data
+
+
+@app.get("/api/frequencies")
+async def api_frequencies() -> dict[str, Any]:
+    return frequency_policy_dict()
+
+
+class BowlPresetIn(BaseModel):
+    name: str
+
+
+@app.post("/api/bowl/preset")
+async def api_bowl_preset(body: BowlPresetIn) -> dict[str, Any]:
+    global _bowl_params
+    _bowl_params = apply_named_preset(body.name, _bowl_params)
+    bowl = _get_bowl()
+    return {
+        "params": bowl.to_api_dict()["params"],
+        "help": params_help(),
+        "calibration": True,
+        "result": bowl.to_api_dict(),
+        "preset": body.name,
+    }
+
+
+class BowlCompareIn(BaseModel):
+    a: dict[str, Any]
+    b: dict[str, Any]
+
+
+@app.post("/api/bowl/compare")
+async def api_bowl_compare(body: BowlCompareIn) -> dict[str, Any]:
+    return compare_bowl_presets(body.a, body.b)
 
 
 def main() -> None:

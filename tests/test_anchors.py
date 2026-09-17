@@ -11,7 +11,9 @@ from src.simulation import Simulation, SimulationConfig
 
 
 def test_anchor_1_f0_home_only_10_or_19() -> None:
-    """1. f0 ∈ {10 MHz, 19 MHz} for home models."""
+    """1. Home manufacturer defaults are 10/19 MHz; allowed sim set is {1,3,10,19}."""
+    from src.frequencies import ALLOWED_F0_HZ
+
     for model, expected in (
         ("SKINOVA_10", 10e6),
         ("SKINOVA_MED", 10e6),
@@ -21,6 +23,16 @@ def test_anchor_1_f0_home_only_10_or_19() -> None:
         assert sim.f0 in (10e6, 19e6)
         assert sim.f0 == expected
         assert sim.f0 == float(sim.devices["models"][model]["f0_hz"])
+
+    # Explicit selection of 1/3 MHz must not crash and must stay in allowed set
+    for f0 in (1e6, 3e6, 10e6, 19e6):
+        sim = Simulation(SimulationConfig(model="SKINOVA_10", seed=1, f0_hz_override=f0))
+        assert sim.f0 == f0
+        assert sim.f0 in ALLOWED_F0_HZ
+        assert sim.x_half > 0
+        _ = sim.prop.profile(0.3)
+
+    assert ALLOWED_F0_HZ == frozenset({1e6, 3e6, 10e6, 19e6})
 
 
 def test_anchor_2_i_sata_le_0_5() -> None:
@@ -83,8 +95,8 @@ def test_anchor_4_no_gel_pac_zero_t_rises() -> None:
 
 
 def test_anchor_5_half_value_depth() -> None:
-    """5. I(x½) ≈ I0/2."""
-    for f0, xh in ((10e6, 0.003), (19e6, 0.0015)):
+    """5. I(x½) ≈ I0/2 for manufacturer 10/19 and calib 1/3 MHz."""
+    for f0, xh in ((10e6, 0.003), (19e6, 0.0015), (1e6, 0.030), (3e6, 0.010)):
         prop = Propagation(f_hz=f0, x_half_m=xh)
         i0 = 0.5
         i_half = prop.intensity_w_cm2(i0, xh)

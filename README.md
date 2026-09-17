@@ -121,3 +121,6 @@ docker build -t skinova-sim .
 docker run --rm -p 8765:8765 skinova-sim
 ```
 
+
+
+Frequencies: 1/3/10/19 MHz — see DELIVERY_FREQ.md

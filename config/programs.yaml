@@ -251,3 +251,20 @@ SKINOVA_MED:
     i_sata_w_cm2: 0.30
     prf_hz: 100
     zones: [body]
+
+# Clinical LDM Triple stub programs (NOT home Skinova firmware)
+LDM_TRIPLE:
+  - id: 1
+    name: LDM Triple compare (calib)
+    mode: PR_1_2
+    duration_s: 600
+    i_sata_w_cm2: 0.30
+    prf_hz: 100
+    zones: [face]
+  - id: 2
+    name: LDM deep (1/3 MHz class)
+    mode: CONT
+    duration_s: 600
+    i_sata_w_cm2: 0.35
+    prf_hz: 100
+    zones: [body]

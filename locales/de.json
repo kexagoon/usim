@@ -92,7 +92,9 @@
     "f0": "f0",
     "era": "ERA",
     "lambda": "Wellenlänge λ",
-    "zn": "Nahfeld z_n"
+    "zn": "Nahfeld z_n",
+    "f0_select": "Frequenz f0 (Simulation)",
+    "f0_hint": "1/3 MHz: klinische/LDM-Klasse zur Simulation — keine Werks-Firmware-Hops der Home-Geräte (Defaults weiter 10/19 MHz)."
   },
   "plots": {
     "i_x": "I(x) Intensität",
@@ -113,7 +115,7 @@
     "run_seconds": "Simulieren (s)"
   },
   "selftest": {
-    "a1": "f0 nur 10 oder 19 MHz (Home)",
+    "a1": "f0 Home-Defaults 10/19; erlaubt {1,3,10,19} MHz",
     "a2": "I_SATA ≤ 0,5 W/cm²",
     "a3": "P_ac ≤ 1,5 W",
     "a4": "Ohne Gel: P_ac≈0, T_piezo steigt",
@@ -150,7 +152,8 @@
   "models": {
     "SKINOVA_10": "Skinova 10 MHz",
     "SKINOVA_19": "Skinova 19 MHz",
-    "SKINOVA_MED": "Skinova MED"
+    "SKINOVA_MED": "Skinova MED",
+    "LDM_TRIPLE": "LDM Triple (klinisch)"
   },
   "yes": "Ja",
   "no": "Nein",
@@ -216,6 +219,43 @@
     "radius_mm": "Radius r (mm)",
     "i_wcm2": "I (W/cm²)",
     "dual_scale": "Duale Skala: Kleber in µm, übrige Schichten in mm",
-    "notes_title": "Hinweise"
+    "notes_title": "Hinweise",
+    "f0_hint": "Erlaubt: 1 / 3 / 10 / 19 MHz. 1/3 MHz klinisch/LDM-Klasse (Kalibrierung).",
+    "preset_thin_glue": "dünner Kleber",
+    "preset_thick_glue": "dicker Kleber",
+    "preset_air": "Luftlast",
+    "preset_gel": "Gel",
+    "preset_1mhz": "1 MHz klinisch",
+    "preset_3mhz": "3 MHz",
+    "preset_19": "19 MHz Skinova",
+    "preset_backing": "Heavy backing",
+    "preset_match": "Matching an",
+    "sec_drive": "Ansteuerung / Last",
+    "sec_materials": "Materialien",
+    "sec_geometry": "Geometrie",
+    "sec_advanced": "Matching / Backing",
+    "sec_compare": "A/B Vergleich",
+    "face_mat": "Gesichtsmaterial",
+    "kt": "kt (Kopplung)",
+    "span": "Spektrum-Span (±)",
+    "matching": "Anpassschicht aktiv",
+    "matching_mat": "Anpassschicht-Material",
+    "matching_h": "Anpassschicht-Dicke",
+    "backing": "Backing",
+    "backing_air": "Luft (schmalbandig)",
+    "backing_heavy": "Schwer (breitbandig)",
+    "load_water": "Wasser",
+    "load_tissue": "Weichgewebe",
+    "load_fat": "Fett (Kalib.)",
+    "load_bone": "Knochen (Kalib.)",
+    "sweep_dia": "Piezo-Durchmesser → P_ac / I",
+    "sweep_f0": "f0-Vergleich 1/3/10/19 MHz",
+    "profile": "Stehende Welle / |p|(z)",
+    "phase": "Phase ∠Z_in / ∠T",
+    "tof": "Laufzeit TOF",
+    "lambda": "λ Gewebe",
+    "compare_a": "Preset A",
+    "compare_b": "Preset B",
+    "compare_run": "Vergleichen"
   }
 }

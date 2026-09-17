@@ -27,6 +27,7 @@
           <option value="SKINOVA_10" data-i18n="models.SKINOVA_10">Skinova 10</option>
           <option value="SKINOVA_19" selected data-i18n="models.SKINOVA_19">Skinova 19</option>
           <option value="SKINOVA_MED" data-i18n="models.SKINOVA_MED">Skinova MED</option>
+          <option value="LDM_TRIPLE" data-i18n="models.LDM_TRIPLE">LDM Triple</option>
         </select>
       </label>
       <button id="btnStart" class="primary" data-i18n="header.start">{{ i18n.header.start }}</button>
@@ -112,6 +113,15 @@
       <label><span data-i18n="fields.force_n">{{ i18n.fields.force_n }}</span>
         <input type="number" id="forceN" min="0.5" max="2" step="0.1" value="1.0" />
       </label>
+      <label><span data-i18n="fields.f0_select">{{ i18n.fields.f0_select }}</span>
+        <select id="f0Select">
+          <option value="1000000">1 MHz</option>
+          <option value="3000000">3 MHz</option>
+          <option value="10000000">10 MHz</option>
+          <option value="19000000" selected>19 MHz</option>
+        </select>
+      </label>
+      <p class="hint" data-i18n="fields.f0_hint">{{ i18n.fields.f0_hint }}</p>
       <label><span data-i18n="fields.x_half">{{ i18n.fields.x_half }}</span>
         <input type="text" id="xHalf" readonly value="—" />
       </label>
@@ -222,59 +232,162 @@
     <div class="bowl-grid">
       <aside class="panel bowl-controls">
         <h2 data-i18n="bowl.controls">Controls</h2>
-        <label><span data-i18n="bowl.f0">f0</span>
-          <select id="bowlF0">
-            <option value="10000000">10 MHz</option>
-            <option value="19000000" selected>19 MHz</option>
-          </select>
-        </label>
-        <label><span data-i18n="bowl.drive">Drive</span>
-          <input type="range" id="bowlDrive" min="0.05" max="1" step="0.05" value="1" />
-          <span id="bowlDriveVal">1.00</span>
-        </label>
-        <label><span data-i18n="bowl.load">Load</span>
-          <select id="bowlLoad">
-            <option value="air" data-i18n="bowl.load_air">air</option>
-            <option value="gel" data-i18n="bowl.load_gel">gel</option>
-            <option value="gel_tissue" selected data-i18n="bowl.load_gel_tissue">gel+tissue</option>
-          </select>
-        </label>
-        <label><span data-i18n="bowl.piezo_mat">Piezo</span>
-          <select id="bowlPiezoMat">
-            <option value="pzt8">PZT-8</option>
-            <option value="pzt5a">PZT-5A</option>
-          </select>
-        </label>
-        <label><span data-i18n="bowl.glue_mat">Glue</span>
-          <select id="bowlGlueMat">
-            <option value="glue_epoxy">Epoxy</option>
-            <option value="glue_cyano">Cyanoacrylate</option>
-          </select>
-        </label>
-        <label><span data-i18n="bowl.ti_h">Ti thickness</span>
-          <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
-          <small class="help" data-i18n="bowl.help_ti"></small>
-        </label>
-        <label><span data-i18n="bowl.ti_d">Ti diameter (mm)</span>
-          <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" />
-          <small class="help" data-i18n="bowl.help_dia"></small>
-        </label>
-        <label><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
-          <input type="number" id="bowlPiezoH" min="0.05" max="0.5" step="0.005" value="" placeholder="auto λ/2" />
-          <label class="check"><input type="checkbox" id="bowlPiezoAuto" checked />
-            <span data-i18n="bowl.piezo_h_auto">Auto</span></label>
-          <small class="help" data-i18n="bowl.help_piezo"></small>
-        </label>
-        <label><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
-          <input type="number" id="bowlPiezoD" min="10" max="19.54" step="0.1" value="18" />
-        </label>
-        <label><span data-i18n="bowl.glue_h">Glue (µm)</span>
-          <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
-          <small class="help" data-i18n="bowl.help_glue"></small>
-        </label>
-        <label><span data-i18n="bowl.gel_h">Gel (mm)</span>
-          <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
-        </label>
+        <div class="freq-chips" id="bowlFreqChips" role="group">
+          <button type="button" class="chip" data-f0="1000000">1</button>
+          <button type="button" class="chip" data-f0="3000000">3</button>
+          <button type="button" class="chip" data-f0="10000000">10</button>
+          <button type="button" class="chip active" data-f0="19000000">19</button>
+          <span class="chip-unit">MHz</span>
+        </div>
+        <select id="bowlF0" class="hidden-select" aria-hidden="true">
+          <option value="1000000">1 MHz</option>
+          <option value="3000000">3 MHz</option>
+          <option value="10000000">10 MHz</option>
+          <option value="19000000" selected>19 MHz</option>
+        </select>
+        <p class="hint" data-i18n="bowl.f0_hint"></p>
+        <div class="preset-row" id="bowlPresets">
+          <button type="button" class="preset-btn" data-preset="thin_glue" data-i18n="bowl.preset_thin_glue">dünner Kleber</button>
+          <button type="button" class="preset-btn" data-preset="thick_glue" data-i18n="bowl.preset_thick_glue">dicker Kleber</button>
+          <button type="button" class="preset-btn" data-preset="air_load" data-i18n="bowl.preset_air">Luftlast</button>
+          <button type="button" class="preset-btn" data-preset="gel_load" data-i18n="bowl.preset_gel">Gel</button>
+          <button type="button" class="preset-btn" data-preset="clinical_1mhz" data-i18n="bowl.preset_1mhz">1 MHz klinisch</button>
+          <button type="button" class="preset-btn" data-preset="clinical_3mhz" data-i18n="bowl.preset_3mhz">3 MHz</button>
+          <button type="button" class="preset-btn" data-preset="skinova_19" data-i18n="bowl.preset_19">19 MHz Skinova</button>
+          <button type="button" class="preset-btn" data-preset="heavy_backing" data-i18n="bowl.preset_backing">Heavy backing</button>
+          <button type="button" class="preset-btn" data-preset="with_matching" data-i18n="bowl.preset_match">Matching</button>
+        </div>
+
+        <details open class="collapsible">
+          <summary data-i18n="bowl.sec_drive">Ansteuerung / Last</summary>
+          <label><span data-i18n="bowl.drive">Drive</span>
+            <input type="range" id="bowlDrive" min="0.05" max="1" step="0.05" value="1" />
+            <span id="bowlDriveVal">1.00</span>
+          </label>
+          <label><span data-i18n="bowl.load">Load</span>
+            <select id="bowlLoad">
+              <option value="air" data-i18n="bowl.load_air">air</option>
+              <option value="water" data-i18n="bowl.load_water">water</option>
+              <option value="gel" data-i18n="bowl.load_gel">gel</option>
+              <option value="soft_tissue" data-i18n="bowl.load_tissue">tissue</option>
+              <option value="fat" data-i18n="bowl.load_fat">fat</option>
+              <option value="bone" data-i18n="bowl.load_bone">bone</option>
+              <option value="gel_tissue" selected data-i18n="bowl.load_gel_tissue">gel+tissue</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.span">Spektrum-Span</span>
+            <input type="number" id="bowlSpan" min="0.05" max="0.5" step="0.05" value="0.15" />
+          </label>
+        </details>
+
+        <details open class="collapsible">
+          <summary data-i18n="bowl.sec_materials">Materialien</summary>
+          <label><span data-i18n="bowl.piezo_mat">Piezo</span>
+            <select id="bowlPiezoMat">
+              <option value="pzt4">PZT-4</option>
+              <option value="pzt5a">PZT-5A</option>
+              <option value="pzt8" selected>PZT-8</option>
+              <option value="batio3">BaTiO3</option>
+              <option value="piezo_custom">Custom</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.glue_mat">Glue</span>
+            <select id="bowlGlueMat">
+              <option value="glue_epoxy">Epoxy</option>
+              <option value="glue_cyano">Cyanoacrylate</option>
+              <option value="glue_silicone">Silicone soft</option>
+              <option value="glue_thick">Thick bond</option>
+              <option value="glue_custom">Custom</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.face_mat">Face</span>
+            <select id="bowlFaceMat">
+              <option value="titanium" selected>Titanium</option>
+              <option value="titanium_pvd">Titanium+PVD</option>
+              <option value="stainless">Stainless</option>
+              <option value="face_custom">Custom</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.kt">kt</span>
+            <input type="number" id="bowlKt" min="0.2" max="0.9" step="0.01" value="0.64" />
+          </label>
+        </details>
+
+        <details open class="collapsible">
+          <summary data-i18n="bowl.sec_geometry">Geometrie</summary>
+          <label><span data-i18n="bowl.ti_h">Ti thickness</span>
+            <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
+            <small class="help" data-i18n="bowl.help_ti"></small>
+          </label>
+          <label><span data-i18n="bowl.ti_d">Ti diameter (mm)</span>
+            <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" />
+            <small class="help" data-i18n="bowl.help_dia"></small>
+          </label>
+          <label><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
+            <input type="number" id="bowlPiezoH" min="0.05" max="2.5" step="0.005" value="" placeholder="auto λ/2" />
+            <label class="check"><input type="checkbox" id="bowlPiezoAuto" checked />
+              <span data-i18n="bowl.piezo_h_auto">Auto</span></label>
+            <small class="help" data-i18n="bowl.help_piezo"></small>
+          </label>
+          <label><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
+            <input type="number" id="bowlPiezoD" min="10" max="19.54" step="0.1" value="18" />
+          </label>
+          <label><span data-i18n="bowl.glue_h">Glue (µm)</span>
+            <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
+            <small class="help" data-i18n="bowl.help_glue"></small>
+          </label>
+          <label><span data-i18n="bowl.gel_h">Gel (mm)</span>
+            <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
+          </label>
+        </details>
+
+        <details class="collapsible">
+          <summary data-i18n="bowl.sec_advanced">Matching / Backing</summary>
+          <label class="check"><input type="checkbox" id="bowlMatchEn" />
+            <span data-i18n="bowl.matching">Matching layer</span></label>
+          <label><span data-i18n="bowl.matching_mat">Matching material</span>
+            <select id="bowlMatchMat">
+              <option value="matching_epoxy">Epoxy λ/4</option>
+              <option value="matching_polymer">Polymer</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.matching_h">Matching (µm)</span>
+            <input type="number" id="bowlMatchH" min="10" max="200" step="5" value="50" />
+          </label>
+          <label><span data-i18n="bowl.backing">Backing</span>
+            <select id="bowlBacking">
+              <option value="air" data-i18n="bowl.backing_air">Air</option>
+              <option value="heavy" data-i18n="bowl.backing_heavy">Heavy</option>
+            </select>
+          </label>
+        </details>
+
+        <details class="collapsible">
+          <summary data-i18n="bowl.sec_compare">A/B Vergleich</summary>
+          <label><span data-i18n="bowl.compare_a">Preset A</span>
+            <select id="bowlCmpA">
+              <option value="thin_glue">thin_glue</option>
+              <option value="thick_glue">thick_glue</option>
+              <option value="air_load">air_load</option>
+              <option value="gel_load">gel_load</option>
+              <option value="clinical_1mhz">clinical_1mhz</option>
+              <option value="skinova_19" selected>skinova_19</option>
+            </select>
+          </label>
+          <label><span data-i18n="bowl.compare_b">Preset B</span>
+            <select id="bowlCmpB">
+              <option value="thin_glue">thin_glue</option>
+              <option value="thick_glue" selected>thick_glue</option>
+              <option value="air_load">air_load</option>
+              <option value="gel_load">gel_load</option>
+              <option value="clinical_1mhz">clinical_1mhz</option>
+              <option value="skinova_19">skinova_19</option>
+            </select>
+          </label>
+          <button type="button" id="btnBowlCompare" data-i18n="bowl.compare_run">Vergleichen</button>
+          <pre id="bowlCompareOut" class="compare-out"></pre>
+        </details>
+
         <div class="btn-row">
           <button id="btnBowlAnalyze" class="primary" data-i18n="bowl.apply">Analysieren</button>
           <button id="btnBowlReset" data-i18n="bowl.reset">Defaults</button>
@@ -286,6 +399,8 @@
           <div><span data-i18n="bowl.shift">Δf</span>: <b id="bowlShift">—</b></div>
           <div><span data-i18n="bowl.p_rad">P_ac</span>: <b id="bowlPac">—</b></div>
           <div><span data-i18n="bowl.efficiency">η</span>: <b id="bowlEta">—</b></div>
+          <div><span data-i18n="bowl.tof">TOF</span>: <b id="bowlTof">—</b></div>
+          <div><span data-i18n="bowl.lambda">λ</span>: <b id="bowlLam">—</b></div>
         </div>
       </aside>
 
@@ -318,6 +433,22 @@
       <section class="panel bowl-chart wide">
         <h2 data-i18n="bowl.field">Near-field</h2>
         <div class="chart-wrap field-wrap"><canvas id="chartBowlField"></canvas></div>
+      </section>
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.sweep_dia">Piezo-Durchmesser</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlDia"></canvas></div>
+      </section>
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.sweep_f0">f0 Vergleich 1/3/10/19</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlF0"></canvas></div>
+      </section>
+      <section class="panel bowl-chart wide">
+        <h2 data-i18n="bowl.profile">Druckprofil (1D)</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlProfile"></canvas></div>
+      </section>
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.phase">Phase Z_in / T</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlPhase"></canvas></div>
       </section>
     </div>
   </main>
