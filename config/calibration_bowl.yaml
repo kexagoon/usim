@@ -1,0 +1,105 @@
+# CALIBRATION_PRESET — model parameters for the acoustic bowl (чаша) stack.
+# NOT published factory dimensions. Edit freely; UI shows calibration badge.
+# Hard manufacturer anchors elsewhere: ERA=3.0 cm², I_max=0.5 W/cm², P_ac_max=1.5 W,
+# f0 ∈ {10,19} MHz, face titanium (+PVD on 19), tissue c=1540 m/s, gel Z≈1.5 MRayl, air Z≈400 Rayl.
+
+CALIBRATION_PRESET: true
+label: "Kalibrierung / калибровка — keine Werksmaße"
+
+anchors:
+  era_cm2: 3.0          # manufacturer (immutable in logic)
+  i_max_w_cm2: 0.5
+  p_ac_max_w: 1.5
+  f0_hz_options: [10000000, 19000000]
+  c_tissue_m_s: 1540
+  z_gel_mrayl: 1.5
+  z_air_rayl: 400
+
+# Equivalent radiating diameter from ERA: d_eq = 2*sqrt(ERA/π) ≈ 19.5 mm
+era_derived:
+  d_eq_mm: 19.54        # computed; override allowed as model parameter
+
+materials:
+  # Densities / speeds / Z — editable model parameters (typical literature ranges)
+  pzt8:
+    name: PZT-8
+    rho_kg_m3: 7600
+    c_m_s: 4200          # thickness-mode ~4000–4600
+    z_mrayl: 31.9        # rho*c / 1e6
+    attenuation_np_m_mhz: 5.0
+    help: "Modellparameter; typ. PZT-8. Dicke ≈ λ/2 bei f0 in Keramik."
+  pzt5a:
+    name: PZT-5A
+    rho_kg_m3: 7750
+    c_m_s: 4350
+    z_mrayl: 33.7
+    attenuation_np_m_mhz: 8.0
+    help: "Weicherer PZT; höhere Dämpfung — Modellparameter."
+  titanium:
+    name: Titanium (Ti-6Al-4V approx)
+    rho_kg_m3: 4430
+    c_m_s: 6100
+    z_mrayl: 27.0
+    attenuation_np_m_mhz: 0.5
+    help: "Gesicht / Schale: Titan; Dicke 0.1–1.0 mm typ. (nicht veröffentlicht)."
+  glue_epoxy:
+    name: Epoxy acoustic bond
+    rho_kg_m3: 1200
+    c_m_s: 2500
+    z_mrayl: 3.0
+    attenuation_np_m_mhz: 50.0
+    help: "Kleberschicht 1–50 µm typ.; dickere Schicht → mehr Fehlanpassung/Verlust."
+  glue_cyano:
+    name: Cyanoacrylate bond
+    rho_kg_m3: 1100
+    c_m_s: 2200
+    z_mrayl: 2.4
+    attenuation_np_m_mhz: 80.0
+    help: "Dünnere typ. Schicht; Modellparameter."
+  gel:
+    name: Ultrasound gel
+    rho_kg_m3: 1010
+    c_m_s: 1480
+    z_mrayl: 1.5
+    attenuation_np_m_mhz: 2.0
+  tissue:
+    name: Soft tissue
+    rho_kg_m3: 1050
+    c_m_s: 1540
+    z_mrayl: 1.62
+    attenuation_np_m_mhz: 12.0
+  air:
+    name: Air
+    rho_kg_m3: 1.2
+    c_m_s: 343
+    z_mrayl: 0.0004
+    attenuation_np_m_mhz: 0.0
+
+# Default stack geometry (CALIBRATION — editable in UI)
+defaults:
+  f0_hz: 19000000
+  drive_level: 1.0          # 0–1 relative to P_ac_max budget
+  load: gel_tissue          # air | gel | gel_tissue
+  piezo_material: pzt8
+  glue_material: glue_epoxy
+  ti_thickness_m: 0.0003    # 0.3 mm — range 0.1–1.0 mm
+  ti_diameter_m: 0.01954    # ≈ ERA-derived
+  piezo_thickness_m: null   # null → suggest λ/2 in ceramic at f0
+  piezo_diameter_m: 0.018   # ≤ face diameter
+  glue_thickness_m: 0.00001 # 10 µm — range 1–50 µm
+  gel_thickness_m: 0.0003
+  stack_efficiency: 0.65  # electro-acoustic calibration (0.5–0.8)
+
+ranges:
+  ti_thickness_m: [0.0001, 0.001]
+  piezo_thickness_m: [0.00005, 0.0005]
+  piezo_diameter_m: [0.010, 0.01954]
+  glue_thickness_m: [0.000001, 0.00005]
+  gel_thickness_m: [0.00005, 0.001]
+  drive_level: [0.05, 1.0]
+
+notes:
+  - "Titanium face/bowl and piezo/glue thicknesses are NOT published by the manufacturer."
+  - "Suggested piezo thickness = c_pzt / (2*f0) (λ/2 thickness-mode)."
+  - "Effective radiating diameter follows from ERA=3 cm² → d_eq≈19.5 mm."
+  - "Air load → transmission ≈ 0, energy stays as heat in piezo/glue."

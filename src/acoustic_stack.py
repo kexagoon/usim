@@ -107,3 +107,29 @@ class AcousticStack:
             return 0.0
         t = self.transmission_coefficient(f_hz, gel_thickness_m, gp)
         return p_elec_at_piezo * t
+
+
+def stack_from_bowl(params=None):
+    """Build AcousticStack geometry from AcousticBowl calibration params."""
+    from src.acoustic_bowl import AcousticBowl, default_bowl_params
+
+    p = params or default_bowl_params()
+    bowl = AcousticBowl(p)
+    layers_b = bowl.build_layers()
+    # Keep only solid stack layers (pzt, glue, titanium) for AcousticStack.layers
+    solid = []
+    for ly in layers_b:
+        if ly.name in ("pzt", "glue", "titanium"):
+            solid.append(
+                StackLayer(
+                    name=ly.name if ly.name != "pzt" else "pzt",
+                    z_mrayl=ly.material.z_mrayl,
+                    thickness_m=ly.thickness_m,
+                    c=ly.material.c_m_s,
+                )
+            )
+    gel_present = p.load != "air"
+    gel_h = p.gel_thickness_m if gel_present else 0.0
+    stack = AcousticStack(layers=solid, gel_thickness_m=gel_h, gel_present=gel_present)
+    stack.stack_efficiency = float(getattr(p, "stack_efficiency", 0.65)) if hasattr(p, "stack_efficiency") else 0.65
+    return stack

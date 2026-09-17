@@ -13,12 +13,16 @@
       <strong data-i18n="app.title">{{ i18n.app.title }}</strong>
       <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
     </div>
-    <div class="controls">
+    <nav class="main-tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="therapy" data-i18n="nav.therapy">Therapie</button>
+      <button type="button" class="tab-btn" data-tab="bowl" data-i18n="nav.bowl">Akustik-Schale</button>
+    </nav>
+    <div class="controls" id="therapyControls">
       <div class="lang">
         <button type="button" class="lang-btn" data-lang="de" data-i18n="header.lang_de">DE</button>
         <button type="button" class="lang-btn" data-lang="ru" data-i18n="header.lang_ru">RU</button>
       </div>
-      <label><span data-i18n="header.model">{{ i18n.header.model }}</span>
+      <label class="inline"><span data-i18n="header.model">{{ i18n.header.model }}</span>
         <select id="modelSelect">
           <option value="SKINOVA_10" data-i18n="models.SKINOVA_10">Skinova 10</option>
           <option value="SKINOVA_19" selected data-i18n="models.SKINOVA_19">Skinova 19</option>
@@ -37,7 +41,8 @@
 
   <p class="disclaimer" data-i18n="app.disclaimer">{{ i18n.app.disclaimer }}</p>
 
-  <main class="grid">
+  <!-- ===================== THERAPY TAB ===================== -->
+  <main class="grid desktop-grid" id="tab-therapy" data-tab-panel="therapy">
     <section class="panel">
       <h2 data-i18n="panels.program">{{ i18n.panels.program }}</h2>
       <label><span data-i18n="fields.program_select">{{ i18n.fields.program_select }}</span>
@@ -174,15 +179,15 @@
       </div>
     </section>
 
-    <section class="panel wide">
+    <section class="panel wide plots-panel">
       <h2 data-i18n="panels.plots">{{ i18n.panels.plots }}</h2>
-      <div class="charts">
-        <canvas id="chartIx"></canvas>
-        <canvas id="chartTx"></canvas>
-        <canvas id="chartDose"></canvas>
-        <canvas id="chartSoc"></canvas>
-        <canvas id="chartBurst"></canvas>
-        <canvas id="chartFsm"></canvas>
+      <div class="charts desktop-charts">
+        <div class="chart-wrap"><canvas id="chartIx"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartTx"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartDose"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartSoc"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartBurst"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartFsm"></canvas></div>
       </div>
     </section>
 
@@ -204,6 +209,117 @@
       <h2 data-i18n="panels.contraindications">{{ i18n.panels.contraindications }}</h2>
       <p class="hint" data-i18n="contraindications.hint">{{ i18n.contraindications.hint }}</p>
     </section>
+  </main>
+
+  <!-- ===================== BOWL TAB ===================== -->
+  <main class="bowl-layout hidden" id="tab-bowl" data-tab-panel="bowl">
+    <div class="bowl-header">
+      <h1 data-i18n="bowl.title">Akustik-Schale</h1>
+      <span class="badge calib" data-i18n="bowl.badge">Kalibrierung</span>
+      <p class="hint" data-i18n="bowl.intro"></p>
+    </div>
+
+    <div class="bowl-grid">
+      <aside class="panel bowl-controls">
+        <h2 data-i18n="bowl.controls">Controls</h2>
+        <label><span data-i18n="bowl.f0">f0</span>
+          <select id="bowlF0">
+            <option value="10000000">10 MHz</option>
+            <option value="19000000" selected>19 MHz</option>
+          </select>
+        </label>
+        <label><span data-i18n="bowl.drive">Drive</span>
+          <input type="range" id="bowlDrive" min="0.05" max="1" step="0.05" value="1" />
+          <span id="bowlDriveVal">1.00</span>
+        </label>
+        <label><span data-i18n="bowl.load">Load</span>
+          <select id="bowlLoad">
+            <option value="air" data-i18n="bowl.load_air">air</option>
+            <option value="gel" data-i18n="bowl.load_gel">gel</option>
+            <option value="gel_tissue" selected data-i18n="bowl.load_gel_tissue">gel+tissue</option>
+          </select>
+        </label>
+        <label><span data-i18n="bowl.piezo_mat">Piezo</span>
+          <select id="bowlPiezoMat">
+            <option value="pzt8">PZT-8</option>
+            <option value="pzt5a">PZT-5A</option>
+          </select>
+        </label>
+        <label><span data-i18n="bowl.glue_mat">Glue</span>
+          <select id="bowlGlueMat">
+            <option value="glue_epoxy">Epoxy</option>
+            <option value="glue_cyano">Cyanoacrylate</option>
+          </select>
+        </label>
+        <label><span data-i18n="bowl.ti_h">Ti thickness</span>
+          <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
+          <small class="help" data-i18n="bowl.help_ti"></small>
+        </label>
+        <label><span data-i18n="bowl.ti_d">Ti diameter (mm)</span>
+          <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" />
+          <small class="help" data-i18n="bowl.help_dia"></small>
+        </label>
+        <label><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
+          <input type="number" id="bowlPiezoH" min="0.05" max="0.5" step="0.005" value="" placeholder="auto λ/2" />
+          <label class="check"><input type="checkbox" id="bowlPiezoAuto" checked />
+            <span data-i18n="bowl.piezo_h_auto">Auto</span></label>
+          <small class="help" data-i18n="bowl.help_piezo"></small>
+        </label>
+        <label><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
+          <input type="number" id="bowlPiezoD" min="10" max="19.54" step="0.1" value="18" />
+        </label>
+        <label><span data-i18n="bowl.glue_h">Glue (µm)</span>
+          <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
+          <small class="help" data-i18n="bowl.help_glue"></small>
+        </label>
+        <label><span data-i18n="bowl.gel_h">Gel (mm)</span>
+          <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
+        </label>
+        <div class="btn-row">
+          <button id="btnBowlAnalyze" class="primary" data-i18n="bowl.apply">Analysieren</button>
+          <button id="btnBowlReset" data-i18n="bowl.reset">Defaults</button>
+        </div>
+        <div class="live-grid big" id="bowlMetrics">
+          <div><span data-i18n="bowl.t_at_f0">T</span>: <b id="bowlT">—</b></div>
+          <div><span data-i18n="bowl.r_at_f0">R</span>: <b id="bowlR">—</b></div>
+          <div><span data-i18n="bowl.resonance">f_res</span>: <b id="bowlRes">—</b></div>
+          <div><span data-i18n="bowl.shift">Δf</span>: <b id="bowlShift">—</b></div>
+          <div><span data-i18n="bowl.p_rad">P_ac</span>: <b id="bowlPac">—</b></div>
+          <div><span data-i18n="bowl.efficiency">η</span>: <b id="bowlEta">—</b></div>
+        </div>
+      </aside>
+
+      <section class="panel bowl-viz">
+        <h2 data-i18n="bowl.schematic">Schematic</h2>
+        <p class="hint" data-i18n="bowl.dual_scale"></p>
+        <svg id="bowlSvg" viewBox="0 0 640 320" class="bowl-svg" role="img"></svg>
+      </section>
+
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.spectrum">Spectrum</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlSpectrum"></canvas></div>
+      </section>
+
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.sweep_glue">Glue sweep</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlGlue"></canvas></div>
+      </section>
+
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.sweep_ti">Ti sweep</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlTi"></canvas></div>
+      </section>
+
+      <section class="panel bowl-chart">
+        <h2 data-i18n="bowl.energy">Energy</h2>
+        <div class="chart-wrap tall"><canvas id="chartBowlEnergy"></canvas></div>
+      </section>
+
+      <section class="panel bowl-chart wide">
+        <h2 data-i18n="bowl.field">Near-field</h2>
+        <div class="chart-wrap field-wrap"><canvas id="chartBowlField"></canvas></div>
+      </section>
+    </div>
   </main>
 
   <script>

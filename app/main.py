@@ -17,6 +17,12 @@ from pydantic import BaseModel, Field
 
 from src.i18n import all_strings, list_langs
 from src.simulation import Simulation, SimulationConfig
+from src.acoustic_bowl import (
+    AcousticBowl,
+    bowl_params_from_dict,
+    default_bowl_params,
+    params_help,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = Path(__file__).resolve().parent
@@ -298,6 +304,122 @@ async def api_export_csv() -> StreamingResponse:
 async def api_preset_save(request: Request) -> JSONResponse:
     data = await request.json()
     return JSONResponse({"ok": True, "preset": data})
+
+
+
+# ---------------------------------------------------------------------------
+# Acoustic bowl (Akustik-Schale) API — calibration geometry, not factory data
+# ---------------------------------------------------------------------------
+
+_bowl_params = default_bowl_params()
+
+
+class BowlParamsIn(BaseModel):
+    f0_hz: float | None = None
+    drive_level: float | None = None
+    load: str | None = None
+    piezo_material: str | None = None
+    glue_material: str | None = None
+    ti_thickness_m: float | None = None
+    ti_diameter_m: float | None = None
+    piezo_thickness_m: float | None = None
+    piezo_diameter_m: float | None = None
+    glue_thickness_m: float | None = None
+    gel_thickness_m: float | None = None
+    era_cm2: float | None = None
+
+
+def _get_bowl() -> AcousticBowl:
+    return AcousticBowl(_bowl_params)
+
+
+@app.get("/api/bowl/params")
+async def api_bowl_params_get() -> dict[str, Any]:
+    bowl = _get_bowl()
+    return {
+        "params": bowl.to_api_dict()["params"],
+        "help": params_help(),
+        "calibration": True,
+        "result": bowl.to_api_dict(),
+    }
+
+
+@app.post("/api/bowl/params")
+async def api_bowl_params_post(body: BowlParamsIn) -> dict[str, Any]:
+    global _bowl_params
+    data = body.model_dump(exclude_none=True)
+    _bowl_params = bowl_params_from_dict(data, _bowl_params)
+    bowl = _get_bowl()
+    return {
+        "params": bowl.to_api_dict()["params"],
+        "help": params_help(),
+        "calibration": True,
+        "result": bowl.to_api_dict(),
+    }
+
+
+@app.get("/api/bowl/spectrum")
+async def api_bowl_spectrum(
+    n: int = Query(201, ge=21, le=1001),
+    span: float = Query(0.15, ge=0.02, le=0.5),
+) -> dict[str, Any]:
+    bowl = _get_bowl()
+    f0 = bowl.params.f0_hz
+    spec = bowl.spectrum(f0 * (1 - span), f0 * (1 + span), n=n)
+    return {
+        "calibration": True,
+        "f0_hz": f0,
+        "resonance_hz": bowl.find_resonance(spec),
+        "f_hz": [p.f_hz for p in spec],
+        "t_intensity": [p.t_intensity for p in spec],
+        "r_intensity": [p.r_intensity for p in spec],
+        "z_in_mag": [p.z_in_mag for p in spec],
+        "z_in_real": [p.z_in_real for p in spec],
+        "z_in_imag": [p.z_in_imag for p in spec],
+    }
+
+
+class BowlSweepIn(BaseModel):
+    kind: str = "glue"  # glue | titanium
+    n: int = Field(40, ge=5, le=200)
+    h_min_m: float | None = None
+    h_max_m: float | None = None
+
+
+@app.post("/api/bowl/sweep")
+async def api_bowl_sweep(body: BowlSweepIn) -> dict[str, Any]:
+    bowl = _get_bowl()
+    kind = body.kind.lower()
+    if kind in ("glue", "kleber", "adhesive"):
+        h_min = body.h_min_m if body.h_min_m is not None else 1e-6
+        h_max = body.h_max_m if body.h_max_m is not None else 50e-6
+        data = bowl.sweep_glue(h_min, h_max, n=body.n)
+        data["kind"] = "glue"
+    else:
+        h_min = body.h_min_m if body.h_min_m is not None else 1e-4
+        h_max = body.h_max_m if body.h_max_m is not None else 1e-3
+        data = bowl.sweep_titanium(h_min, h_max, n=body.n)
+        data["kind"] = "titanium"
+    data["calibration"] = True
+    data["f0_hz"] = bowl.params.f0_hz
+    return data
+
+
+@app.get("/api/bowl/field")
+async def api_bowl_field(
+    nx: int = Query(50, ge=10, le=120),
+    nr: int = Query(40, ge=10, le=100),
+) -> dict[str, Any]:
+    bowl = _get_bowl()
+    field = bowl.near_field_map(nx=nx, nr=nr)
+    field["calibration"] = True
+    field["energy"] = bowl.to_api_dict()["energy"]
+    return field
+
+
+@app.get("/api/bowl/analyze")
+async def api_bowl_analyze() -> dict[str, Any]:
+    return _get_bowl().to_api_dict()
 
 
 def main() -> None:

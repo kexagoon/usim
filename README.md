@@ -76,6 +76,16 @@ Programme ändern → **`config/programs.yaml`** bearbeiten.
 
 Herstellerlimits (unveränderlich in der Logik): I_max=0,5 W/cm² SATA, P_ac_max=1,5 W, T_prog≤12 min, f0∈{10,19} MHz.
 
+## Akustik-Schale / Акустическая чаша
+
+Eigener UI-Tab **„Akustik-Schale“** (DE/RU): 1D-Transfermatrix PZT → Kleber → Titan → Gel → Gewebe.
+
+- Querschnitt-Schema, |T(f)|/Impedanz, Kleber-/Titan-Sweeps, Energieaufteilung, Nahfeld
+- Geometrie (Ti-/Piezo-/Kleberdicke) unter **Kalibrierung** (`config/calibration_bowl.yaml`) — keine Werksmaße
+- API: `/api/bowl/params`, `/api/bowl/spectrum`, `/api/bowl/sweep`, `/api/bowl/field`, `/api/bowl/analyze`
+
+Modul: `src/acoustic_bowl.py`.
+
 ## i18n / UI
 
 - Standard: **Deutsch**; Umschalten **DE|RU** ohne Reload-Verlust (localStorage)
