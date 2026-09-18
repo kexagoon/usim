@@ -10,6 +10,8 @@
   let therapyCharts = {};
   let bowlCharts = {};
   let bowlInited = false;
+  let bowlEnergyCache = { start: null, end: null };
+  let bowlEnergyPhase = "end";
 
   function $(id) { return document.getElementById(id); }
   function t(key) {
@@ -505,15 +507,16 @@
       bowlCharts.ti.options.scales.y1 = { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Δf (MHz)" } };
       bowlCharts.ti.options.scales.x.title.text = "Ti (mm)";
     }
-    bowlCharts.energy = new Chart($("chartBowlEnergy"), {
+    if ($("chartBowlEnergy")) {
+      bowlCharts.energy = new Chart($("chartBowlEnergy"), {
       type: "doughnut",
       data: {
         labels: ["P_ac", "glue", "piezo", "Ti"],
         datasets: [{
-          data: [0, 0, 0, 0],
+          data: [0.25, 0.25, 0.25, 0.25],
           backgroundColor: ["#2dd4a8", "#c45c26", "#e6a817", "#8a9ba8"],
           borderWidth: 2,
-          borderColor: getComputedStyle(document.documentElement).getPropertyValue("--panel").trim() || "#151d2c",
+          borderColor: "#151d2c",
           hoverOffset: 6,
         }],
       },
@@ -536,6 +539,7 @@
         },
       },
     });
+    }
     bowlCharts.field = lineChart("chartBowlField", "I(z,0)", "#3b9eff");
     if (bowlCharts.field) {
       bowlCharts.field.options.scales.x.title.text = "z (mm)";
@@ -629,7 +633,7 @@
     }
     if (bowlCharts.ti) bowlCharts.ti.options.scales.x.title.text = t("bowl.ti_mm");
     if (bowlCharts.energy) bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
-    applyEnergyDoughnut();
+    try { applyEnergyDoughnut(); } catch (err) { console.warn(err); }
     if (bowlCharts.temps) {
       bowlCharts.temps.data.datasets[0].label = t("bowl.legend_t_piezo");
       bowlCharts.temps.data.datasets[1].label = t("bowl.legend_t_glue");
@@ -761,20 +765,30 @@
   }
 
   function applyEnergyDoughnut(phase) {
-    if (phase) bowlEnergyPhase = phase;
-    const src = bowlEnergyCache[bowlEnergyPhase] || bowlEnergyCache.end || bowlEnergyCache.start;
-    const parts = energyParts(src);
-    // Avoid empty doughnut looking broken: keep tiny epsilon only if all zero
-    const data = parts.every((v) => v <= 0) ? [0, 0, 0, 0] : parts;
-    if (bowlCharts.energy) {
-      bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
-      bowlCharts.energy.data.datasets[0].data = data;
-      bowlCharts.energy.update();
+    try {
+      if (!bowlEnergyCache) bowlEnergyCache = { start: null, end: null };
+      if (phase) bowlEnergyPhase = phase;
+      const src = bowlEnergyCache[bowlEnergyPhase] || bowlEnergyCache.end || bowlEnergyCache.start;
+      if (!src) {
+        renderEnergyDetail([0, 0, 0, 0]);
+        return;
+      }
+      const parts = energyParts(src);
+      // Chart.js hides an all-zero doughnut — keep a tiny placeholder only for empty state
+      const allZero = parts.every((v) => v <= 0);
+      const data = allZero ? [0.0001, 0, 0, 0] : parts;
+      if (bowlCharts.energy) {
+        bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
+        bowlCharts.energy.data.datasets[0].data = data;
+        bowlCharts.energy.update();
+      }
+      renderEnergyDetail(allZero ? [0, 0, 0, 0] : parts);
+      document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
+        b.classList.toggle("active", b.dataset.phase === bowlEnergyPhase);
+      });
+    } catch (err) {
+      console.warn("applyEnergyDoughnut", err);
     }
-    renderEnergyDetail(parts);
-    document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
-      b.classList.toggle("active", b.dataset.phase === bowlEnergyPhase);
-    });
   }
 
   async function analyzeBowl() {
@@ -791,15 +805,17 @@
     if ($("bowlTof") && result.time_of_flight) $("bowlTof").textContent = (result.time_of_flight.total_ns || 0).toFixed(1) + " ns";
     if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
     drawSchematic(result.layers || [], result.geometry || result.params || {});
-    bowlEnergyCache.start = {
-      p_radiated_w: energy.p_radiated_w || 0,
-      p_glue_loss_w: energy.p_glue_loss_w || 0,
-      p_piezo_heat_w: energy.p_piezo_heat_w || 0,
-      p_ti_loss_w: energy.p_ti_loss_w || 0,
-      efficiency: energy.efficiency || 0,
-    };
-    bowlEnergyCache.end = { ...bowlEnergyCache.start };
-    applyEnergyDoughnut(bowlEnergyPhase);
+    try {
+      bowlEnergyCache.start = {
+        p_radiated_w: energy.p_radiated_w || 0,
+        p_glue_loss_w: energy.p_glue_loss_w || 0,
+        p_piezo_heat_w: energy.p_piezo_heat_w || 0,
+        p_ti_loss_w: energy.p_ti_loss_w || 0,
+        efficiency: energy.efficiency || 0,
+      };
+      bowlEnergyCache.end = Object.assign({}, bowlEnergyCache.start);
+      applyEnergyDoughnut(bowlEnergyPhase);
+    } catch (err) { console.warn("energy cache", err); }
     const span = parseFloat($("bowlSpan") ? $("bowlSpan").value : 0.15);
     const spec = await (await fetch("/api/bowl/spectrum?n=161&span=" + span)).json();
     if (bowlCharts.spectrum) {
