@@ -30,9 +30,29 @@ from src.frequencies import ALLOWED_F0_HZ, frequency_policy_dict, validate_f0
 ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = Path(__file__).resolve().parent
 
-app = FastAPI(title="Skinova / Wellcomet Simulator", version="1.0.0")
+app = FastAPI(title="Skinova / Wellcomet Simulator", version="1.1.0")
 app.mount("/static", StaticFiles(directory=str(APP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(APP_DIR / "templates"))
+
+
+@app.get("/api/build")
+async def api_build() -> JSONResponse:
+    """Deploy stamp so we can verify Render serves the intended revision."""
+    import os as _os
+
+    tpl = APP_DIR / "templates" / "index.html"
+    text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
+    return JSONResponse(
+        {
+            "version": "1.1.0",
+            "usim_build": _os.environ.get("USIM_BUILD", ""),
+            "template_lines": text.count("\n") + (1 if text else 0),
+            "has_cup_depth": "cup_depth" in text,
+            "root": str(ROOT),
+            "app_dir": str(APP_DIR),
+        }
+    )
+
 
 # Global sim instance (single-user desktop tool)
 _sim: Simulation | None = None

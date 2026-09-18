@@ -6,17 +6,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml README.md LICENSE ./
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -U pip \
+    && pip install --no-cache-dir -r requirements.txt
+
 COPY app ./app
 COPY src ./src
 COPY config ./config
 COPY locales ./locales
 COPY tests ./tests
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
 
-RUN pip install --no-cache-dir -U pip && pip install --no-cache-dir .
-
+ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=8765
+ENV USIM_BUILD=cup-help-2026-09-18
 EXPOSE 8765
 
-CMD ["python", "-m", "app.main"]
+CMD ["./docker-entrypoint.sh"]
