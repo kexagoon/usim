@@ -67,6 +67,10 @@ class SettingsIn(BaseModel):
     vdrive_peak_v: float | None = None
     eta_elec: float | None = None
     c0_nF: float | None = None
+    k_eff2: float | None = None
+    q_m_air: float | None = None
+    q_m_gel: float | None = None
+    alpha_power_n: float | None = None
     dt_macro_s: float | None = None
     seed: int | None = None
     enable_2d: bool | None = None
@@ -162,6 +166,18 @@ async def api_settings(body: SettingsIn) -> dict[str, Any]:
         sim.driver.params.eta_elec = body.eta_elec
     if body.c0_nF is not None:
         cfg.c0_nF = body.c0_nF
+        rebuild = True
+    if body.k_eff2 is not None:
+        cfg.k_eff2 = body.k_eff2
+        rebuild = True
+    if body.q_m_air is not None:
+        cfg.q_m_air = body.q_m_air
+        rebuild = True
+    if body.q_m_gel is not None:
+        cfg.q_m_gel = body.q_m_gel
+        rebuild = True
+    if body.alpha_power_n is not None:
+        cfg.alpha_power_n = body.alpha_power_n
         rebuild = True
     if body.dt_macro_s is not None:
         cfg.dt_macro_s = body.dt_macro_s
@@ -329,7 +345,12 @@ class BowlParamsIn(BaseModel):
     glue_material: str | None = None
     face_material: str | None = None
     ti_thickness_m: float | None = None
+    ti_bottom_thickness_m: float | None = None
     ti_diameter_m: float | None = None
+    cup_inner_diameter_m: float | None = None
+    cup_outer_diameter_m: float | None = None
+    cup_wall_thickness_m: float | None = None
+    cup_depth_m: float | None = None
     piezo_thickness_m: float | None = None
     piezo_diameter_m: float | None = None
     glue_thickness_m: float | None = None
@@ -342,6 +363,10 @@ class BowlParamsIn(BaseModel):
     stack_efficiency: float | None = None
     kt: float | None = None
     spectrum_span: float | None = None
+    pcb_drive_v: float | None = None
+    r_wire_piezo_ohm: float | None = None
+    r_ti_return_ohm: float | None = None
+    droplet_demo: bool | None = None
     piezo_rho: float | None = None
     piezo_c: float | None = None
     piezo_z_mrayl: float | None = None

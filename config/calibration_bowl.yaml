@@ -69,7 +69,7 @@ materials:
     c_m_s: 6100
     z_mrayl: 27.0
     attenuation_np_m_mhz: 0.5
-    help: "Gesicht / Schale: Titan; Dicke 0.1–1.0 mm typ. (nicht veröffentlicht)."
+    help: "Ti-Halbschale (полустакан): Boden strahlt; Seitenwände = elektrischer Rückleiter. Dicke Boden 0.1–1.0 mm (Kalibrierung)."
   titanium_pvd:
     name: Titanium + PVD (Skinova 19-like)
     rho_kg_m3: 4430
@@ -212,8 +212,13 @@ defaults:
   piezo_material: pzt8
   glue_material: glue_epoxy
   face_material: titanium
-  ti_thickness_m: 0.0003
-  ti_diameter_m: 0.01954
+  # Ti half-cup (полустакан): bottom radiates; side walls = electrical return
+  ti_thickness_m: 0.0003          # Ti bottom thickness (radiating wall)
+  ti_diameter_m: 0.01954          # radiating outer face Ø (= ERA d_eq default)
+  cup_inner_diameter_m: 0.0185    # inner Ø where piezo is glued
+  cup_outer_diameter_m: 0.01954   # outer Ø of cup (≈ ERA)
+  cup_wall_thickness_m: 0.00052   # side-wall thickness (electrical return path)
+  cup_depth_m: 0.004              # bowl height / side-wall depth (calib, not factory)
   piezo_thickness_m: null
   piezo_diameter_m: 0.018
   glue_thickness_m: 0.00001
@@ -225,6 +230,11 @@ defaults:
   stack_efficiency: 0.65
   kt: 0.64
   spectrum_span: 0.15
+  # Electrode / PCB drive (calibration)
+  pcb_drive_v: 40.0
+  r_wire_piezo_ohm: 0.5
+  r_ti_return_ohm: 0.2
+  droplet_demo: false
 
 ranges:
   ti_thickness_m: [0.0001, 0.001]
@@ -235,6 +245,13 @@ ranges:
   matching_thickness_m: [0.00001, 0.0002]
   drive_level: [0.05, 1.0]
   spectrum_span: [0.05, 0.5]
+  cup_inner_diameter_m: [0.012, 0.022]
+  cup_outer_diameter_m: [0.014, 0.025]
+  cup_wall_thickness_m: [0.0002, 0.002]
+  cup_depth_m: [0.001, 0.015]
+  pcb_drive_v: [5, 80]
+  r_wire_piezo_ohm: [0.01, 20]
+  r_ti_return_ohm: [0.01, 20]
 
 presets:
   thin_glue:
@@ -264,10 +281,13 @@ presets:
     matching_thickness_m: 0.00005
 
 notes:
-  - "Titanium face/bowl and piezo/glue thicknesses are NOT published by the manufacturer."
+  - "Titanium is a half-cup / bowl (полустакан): piezo glued INSIDE bottom; waves exit OUTER Ti face."
+  - "Cup screwed to handpiece where PCB sits. Wiring: PCB→piezo electrode; return via Ti cup walls."
+  - "1D T-matrix along radiating axis only: piezo → glue → Ti bottom → [match] → load. Side walls = electrical return, not primary radiator."
+  - "Cup depth / wall thickness / electrode R are NOT published — CALIBRATION_PRESET."
   - "Suggested piezo thickness = c_pzt / (2*f0) (λ/2 thickness-mode)."
   - "Effective radiating diameter follows from ERA=3 cm² → d_eq≈19.5 mm."
   - "Air load → transmission ≈ 0, energy stays as heat in piezo/glue."
+  - "Droplet demo on outer face is educational (atomization cue), not a medical claim."
   - "Allowed f0 = {1,3,10,19} MHz; 1/3 MHz are clinical/LDM-class simulation options."
-  - "x½ at 1/3 MHz is calibration (α∝f from 10 MHz manufacturer claim)."
   - "Matching layer and heavy backing are educational what-if options."

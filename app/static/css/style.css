@@ -333,3 +333,38 @@ button:active { transform: translateY(1px); }
 .bowl-grid { grid-template-columns: 340px 1fr 1fr; }
 .chart-wrap.tall { height: 340px; }
 .hint { color: var(--muted); font-size: 0.82rem; margin: 0.25rem 0 0.5rem; }
+
+/* Help / captions / info affordances */
+label .help, small.help {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-top: 0.15rem;
+  line-height: 1.35;
+}
+.caption {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0.35rem 0 0;
+  line-height: 1.35;
+}
+.info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-left: 0.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: help;
+  vertical-align: middle;
+}
+.info:hover { border-color: var(--accent); color: var(--accent); }
+.bowl-svg { width: 100%; min-height: 280px; background: var(--panel-2); border-radius: 10px; border: 1px solid var(--border); }
+.bowl-controls { width: min(380px, 100%); }
+.bowl-grid { grid-template-columns: 380px 1fr 1fr; }

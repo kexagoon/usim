@@ -84,6 +84,10 @@ class SimulationConfig:
     vdrive_peak_v: float = 40.0
     eta_elec: float = 0.7
     c0_nF: float = 1.5
+    k_eff2: float | None = None
+    q_m_air: float | None = None
+    q_m_gel: float | None = None
+    alpha_power_n: float | None = None
     motion_still_s: float = 2.0
     motion_eps: float = 0.05
     f0_hz_override: float | None = None  # sim-allowed {1,3,10,19} MHz
@@ -119,9 +123,21 @@ class Simulation:
             params=BVDParams(
                 f0_hz=self.f0,
                 c0_f=self.cfg.c0_nF * 1e-9,
-                k_eff2=float(piezo_cfg["k_eff2"]),
-                q_m_air=float(piezo_cfg["q_m_air"]),
-                q_m_gel=float(piezo_cfg["q_m_gel"]),
+                k_eff2=float(
+                    self.cfg.k_eff2
+                    if self.cfg.k_eff2 is not None
+                    else piezo_cfg["k_eff2"]
+                ),
+                q_m_air=float(
+                    self.cfg.q_m_air
+                    if self.cfg.q_m_air is not None
+                    else piezo_cfg["q_m_air"]
+                ),
+                q_m_gel=float(
+                    self.cfg.q_m_gel
+                    if self.cfg.q_m_gel is not None
+                    else piezo_cfg["q_m_gel"]
+                ),
                 era_m2=self.era_m2,
             ),
             gel_present=self.cfg.gel_present,
@@ -433,6 +449,21 @@ class Simulation:
                 "mass_kg": self.station.specs.mass_kg,
                 "power_va": self.station.specs.power_va,
             },
+            "bvd": {
+                "c0_nF": self.cfg.c0_nF,
+                "k_eff2": self.piezo.params.k_eff2,
+                "q_m_air": self.piezo.params.q_m_air,
+                "q_m_gel": self.piezo.params.q_m_gel,
+                "c1_nF": self.piezo.params.c1_f * 1e9,
+                "l1_uH": self.piezo.params.l1_h * 1e6,
+                "r_m": self.piezo.params.r_m,
+            },
+            "alpha_power_n": self.cfg.alpha_power_n
+            if self.cfg.alpha_power_n is not None
+            else float(self.tissue.get("alpha_power_n", 1.2)),
+            "stack_efficiency": self.cfg.stack_efficiency,
+            "vdrive_peak_v": self.cfg.vdrive_peak_v,
+            "eta_elec": self.cfg.eta_elec,
         }
 
 

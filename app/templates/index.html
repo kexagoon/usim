@@ -46,74 +46,125 @@
   <main class="grid desktop-grid" id="tab-therapy" data-tab-panel="therapy">
     <section class="panel">
       <h2 data-i18n="panels.program">{{ i18n.panels.program }}</h2>
+      <p class="hint" data-i18n="hints.program_panel"></p>
       <label><span data-i18n="fields.program_select">{{ i18n.fields.program_select }}</span>
+        <span class="info" data-i18n-title="hints.program_select" title="">?</span>
         <select id="programSelect"></select>
+        <small class="help" data-i18n="hints.program_select"></small>
       </label>
       <label><span data-i18n="fields.duration_s">{{ i18n.fields.duration_s }}</span>
+        <span class="info" data-i18n-title="hints.duration_s" title="">?</span>
         <input type="number" id="durationS" min="1" max="720" step="1" value="720" />
+        <small class="help" data-i18n="hints.duration_s"></small>
       </label>
       <label><span data-i18n="panels.mode">{{ i18n.panels.mode }}</span>
+        <span class="info" data-i18n-title="hints.mode" title="">?</span>
         <select id="modeSelect">
           <option value="CONT" data-i18n="fields.mode_cont">CONT</option>
           <option value="PR_1_2" selected data-i18n="fields.mode_1_2">1:2</option>
           <option value="PR_1_5" data-i18n="fields.mode_1_5">1:5</option>
         </select>
+        <small class="help" data-i18n="hints.mode"></small>
       </label>
       <label><span data-i18n="fields.i_sata_wcm2">{{ i18n.fields.i_sata_wcm2 }}</span>
+        <span class="info" data-i18n-title="hints.i_sata" title="">?</span>
         <input type="number" id="iSata" min="0.05" max="0.5" step="0.01" value="0.30" />
+        <small class="help" data-i18n="hints.i_sata"></small>
       </label>
       <label><span data-i18n="fields.prf_hz">{{ i18n.fields.prf_hz }}</span>
+        <span class="info" data-i18n-title="hints.prf" title="">?</span>
         <input type="number" id="prfHz" min="50" max="1000" step="10" value="100" />
+        <small class="help" data-i18n="hints.prf"></small>
       </label>
       <label><span data-i18n="panels.duty_interp">{{ i18n.panels.duty_interp }}</span>
+        <span class="info" data-i18n-title="hints.duty" title="">?</span>
         <select id="dutyInterp">
           <option value="RATIO_ON_OFF" data-i18n="fields.duty_ratio_on_off">RATIO_ON_OFF</option>
           <option value="ON_OVER_PERIOD" data-i18n="fields.duty_on_over_period">ON_OVER_PERIOD</option>
         </select>
+        <small class="help" data-i18n="hints.duty"></small>
       </label>
       <label><span data-i18n="panels.limit_domain">{{ i18n.panels.limit_domain }}</span>
+        <span class="info" data-i18n-title="hints.limit_domain" title="">?</span>
         <select id="limitDomain">
           <option value="SATA" data-i18n="fields.limit_sata">SATA</option>
           <option value="SAPA" data-i18n="fields.limit_sapa">SAPA</option>
         </select>
+        <small class="help" data-i18n="hints.limit_domain"></small>
       </label>
       <label><span data-i18n="panels.zones">{{ i18n.panels.zones }}</span>
+        <span class="info" data-i18n-title="hints.zones" title="">?</span>
         <input type="text" id="zones" readonly value="face" />
+        <small class="help" data-i18n="hints.zones"></small>
       </label>
       <button id="btnApply" data-i18n="actions.apply">{{ i18n.actions.apply }}</button>
     </section>
 
     <section class="panel">
       <h2 data-i18n="panels.piezo_driver">{{ i18n.panels.piezo_driver }}</h2>
+      <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
+      <p class="hint" data-i18n="hints.piezo_panel"></p>
       <label><span data-i18n="fields.c0_nF">{{ i18n.fields.c0_nF }}</span>
-        <input type="number" id="c0nF" min="0.8" max="3" step="0.1" value="1.5" />
+        <span class="info" data-i18n-title="hints.c0" title="">?</span>
+        <input type="number" id="c0nF" min="0.5" max="5" step="0.1" value="1.5" />
+        <small class="help" data-i18n="hints.c0"></small>
+      </label>
+      <label><span data-i18n="fields.k_eff2">{{ i18n.fields.k_eff2 }}</span>
+        <span class="info" data-i18n-title="hints.k_eff2" title="">?</span>
+        <input type="number" id="kEff2" min="0.1" max="0.7" step="0.01" value="0.4" />
+        <small class="help" data-i18n="hints.k_eff2"></small>
+      </label>
+      <label><span data-i18n="fields.q_m_air">{{ i18n.fields.q_m_air }}</span>
+        <span class="info" data-i18n-title="hints.q_m_air" title="">?</span>
+        <input type="number" id="qMAir" min="20" max="300" step="1" value="120" />
+        <small class="help" data-i18n="hints.q_m_air"></small>
+      </label>
+      <label><span data-i18n="fields.q_m_gel">{{ i18n.fields.q_m_gel }}</span>
+        <span class="info" data-i18n-title="hints.q_m_gel" title="">?</span>
+        <input type="number" id="qMGel" min="5" max="80" step="1" value="25" />
+        <small class="help" data-i18n="hints.q_m_gel"></small>
       </label>
       <label><span data-i18n="fields.vdrive">{{ i18n.fields.vdrive }}</span>
-        <input type="number" id="vdrive" min="20" max="80" step="1" value="40" />
+        <span class="info" data-i18n-title="hints.vdrive" title="">?</span>
+        <input type="number" id="vdrive" min="5" max="80" step="1" value="40" />
+        <small class="help" data-i18n="hints.vdrive"></small>
       </label>
       <label><span data-i18n="fields.eta_elec">{{ i18n.fields.eta_elec }}</span>
-        <input type="number" id="etaElec" min="0.4" max="0.95" step="0.01" value="0.7" />
+        <span class="info" data-i18n-title="hints.eta_elec" title="">?</span>
+        <input type="number" id="etaElec" min="0.3" max="0.98" step="0.01" value="0.7" />
+        <small class="help" data-i18n="hints.eta_elec"></small>
       </label>
       <label><span data-i18n="fields.stack_eff">{{ i18n.fields.stack_eff }}</span>
-        <input type="number" id="stackEff" min="0.5" max="0.8" step="0.01" value="0.65" />
+        <span class="info" data-i18n-title="hints.stack_eff" title="">?</span>
+        <input type="number" id="stackEff" min="0.3" max="0.95" step="0.01" value="0.65" />
+        <small class="help" data-i18n="hints.stack_eff"></small>
       </label>
       <div class="live-grid" id="livePiezo">
         <div><span data-i18n="fields.r1">R1</span>: <b id="vR1">—</b></div>
+        <div><span data-i18n="fields.c1">C1</span>: <b id="vC1">—</b></div>
+        <div><span data-i18n="fields.l1">L1</span>: <b id="vL1">—</b></div>
         <div><span data-i18n="fields.p_ac">P_ac</span>: <b id="vPac">—</b></div>
         <div><span data-i18n="fields.p_bat">P_bat</span>: <b id="vPbat">—</b></div>
         <div><span data-i18n="fields.contact">Kontakt</span>: <b id="vContact">—</b></div>
         <div><span data-i18n="fields.vswr">VSWR</span>: <b id="vVswr">—</b></div>
       </div>
+      <p class="caption" data-i18n="captions.bvd_live"></p>
     </section>
 
     <section class="panel">
       <h2 data-i18n="panels.acoustics">{{ i18n.panels.acoustics }}</h2>
+      <p class="hint" data-i18n="hints.acoustics_panel"></p>
       <label class="check"><input type="checkbox" id="gelPresent" checked />
-        <span data-i18n="fields.gel_present">{{ i18n.fields.gel_present }}</span></label>
+        <span data-i18n="fields.gel_present">{{ i18n.fields.gel_present }}</span>
+        <span class="info" data-i18n-title="hints.gel" title="">?</span></label>
+      <small class="help" data-i18n="hints.gel"></small>
       <label><span data-i18n="fields.force_n">{{ i18n.fields.force_n }}</span>
-        <input type="number" id="forceN" min="0.5" max="2" step="0.1" value="1.0" />
+        <span class="info" data-i18n-title="hints.force" title="">?</span>
+        <input type="number" id="forceN" min="0.2" max="5" step="0.1" value="1.0" />
+        <small class="help" data-i18n="hints.force"></small>
       </label>
       <label><span data-i18n="fields.f0_select">{{ i18n.fields.f0_select }}</span>
+        <span class="info" data-i18n-title="hints.f0" title="">?</span>
         <select id="f0Select">
           <option value="1000000">1 MHz</option>
           <option value="3000000">3 MHz</option>
@@ -123,10 +174,19 @@
       </label>
       <p class="hint" data-i18n="fields.f0_hint">{{ i18n.fields.f0_hint }}</p>
       <label><span data-i18n="fields.x_half">{{ i18n.fields.x_half }}</span>
+        <span class="info" data-i18n-title="hints.x_half" title="">?</span>
         <input type="text" id="xHalf" readonly value="—" />
+        <small class="help" data-i18n="hints.x_half"></small>
+      </label>
+      <label><span data-i18n="fields.alpha_n">{{ i18n.fields.alpha_n }}</span>
+        <span class="info" data-i18n-title="hints.alpha_n" title="">?</span>
+        <input type="number" id="alphaN" min="0.8" max="2.0" step="0.05" value="1.2" />
+        <small class="help" data-i18n="hints.alpha_n"></small>
       </label>
       <label class="check"><input type="checkbox" id="enable2d" />
-        <span data-i18n="fields.enable_2d">{{ i18n.fields.enable_2d }}</span></label>
+        <span data-i18n="fields.enable_2d">{{ i18n.fields.enable_2d }}</span>
+        <span class="info" data-i18n-title="hints.enable_2d" title="">?</span></label>
+      <small class="help" data-i18n="hints.enable_2d"></small>
       <div class="live-grid">
         <div><span data-i18n="fields.f0">f0</span>: <b id="vF0">—</b></div>
         <div><span data-i18n="fields.lambda">λ</span>: <b id="vLam">—</b></div>
@@ -137,18 +197,25 @@
 
     <section class="panel">
       <h2 data-i18n="panels.operator">{{ i18n.panels.operator }}</h2>
-      <label><span data-i18n="panels.operator">Path</span>
+      <p class="hint" data-i18n="hints.operator_panel"></p>
+      <label><span data-i18n="fields.path">{{ i18n.fields.path }}</span>
+        <span class="info" data-i18n-title="hints.path" title="">?</span>
         <select id="pathSelect">
           <option value="circle" data-i18n="fields.path_circle">circle</option>
           <option value="linear" data-i18n="fields.path_linear">linear</option>
           <option value="still" data-i18n="fields.path_still">still</option>
         </select>
+        <small class="help" data-i18n="hints.path"></small>
       </label>
       <label><span data-i18n="fields.dt_macro">{{ i18n.fields.dt_macro }}</span>
+        <span class="info" data-i18n-title="hints.dt_macro" title="">?</span>
         <input type="number" id="dtMacro" min="1" max="10" step="1" value="5" />
+        <small class="help" data-i18n="hints.dt_macro"></small>
       </label>
       <label><span data-i18n="fields.seed">{{ i18n.fields.seed }}</span>
+        <span class="info" data-i18n-title="hints.seed" title="">?</span>
         <input type="number" id="seed" value="42" />
+        <small class="help" data-i18n="hints.seed"></small>
       </label>
       <label><span data-i18n="actions.run_seconds">{{ i18n.actions.run_seconds }}</span>
         <input type="number" id="runSec" min="0.1" max="60" step="0.1" value="2" />
@@ -160,20 +227,31 @@
     <section class="panel">
       <h2 data-i18n="panels.safety19">{{ i18n.panels.safety19 }}</h2>
       <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
+      <p class="hint" data-i18n="hints.safety_panel"></p>
       <label><span data-i18n="fields.t_warn">{{ i18n.fields.t_warn }}</span>
+        <span class="info" data-i18n-title="hints.t_warn" title="">?</span>
         <input type="number" id="tWarn" min="35" max="45" step="0.5" value="41" />
+        <small class="help" data-i18n="hints.t_warn"></small>
       </label>
       <label><span data-i18n="fields.t_off">{{ i18n.fields.t_off }}</span>
+        <span class="info" data-i18n-title="hints.t_off" title="">?</span>
         <input type="number" id="tOff" min="36" max="50" step="0.5" value="43" />
+        <small class="help" data-i18n="hints.t_off"></small>
       </label>
       <label><span data-i18n="fields.motion_still_s">{{ i18n.fields.motion_still_s }}</span>
+        <span class="info" data-i18n-title="hints.motion_still" title="">?</span>
         <input type="number" id="motionStill" min="0.5" max="10" step="0.1" value="2" />
+        <small class="help" data-i18n="hints.motion_still"></small>
       </label>
       <label><span data-i18n="fields.motion_eps">{{ i18n.fields.motion_eps }}</span>
+        <span class="info" data-i18n-title="hints.motion_eps" title="">?</span>
         <input type="number" id="motionEps" min="0.01" max="1" step="0.01" value="0.05" />
+        <small class="help" data-i18n="hints.motion_eps"></small>
       </label>
       <label><span data-i18n="fields.bat_capacity">{{ i18n.fields.bat_capacity }}</span>
+        <span class="info" data-i18n-title="hints.bat" title="">?</span>
         <input type="number" id="batCap" min="0.5" max="10" step="0.1" value="2.5" />
+        <small class="help" data-i18n="hints.bat"></small>
       </label>
     </section>
 
@@ -192,12 +270,12 @@
     <section class="panel wide plots-panel">
       <h2 data-i18n="panels.plots">{{ i18n.panels.plots }}</h2>
       <div class="charts desktop-charts">
-        <div class="chart-wrap"><canvas id="chartIx"></canvas></div>
-        <div class="chart-wrap"><canvas id="chartTx"></canvas></div>
-        <div class="chart-wrap"><canvas id="chartDose"></canvas></div>
-        <div class="chart-wrap"><canvas id="chartSoc"></canvas></div>
-        <div class="chart-wrap"><canvas id="chartBurst"></canvas></div>
-        <div class="chart-wrap"><canvas id="chartFsm"></canvas></div>
+        <div class="chart-wrap"><canvas id="chartIx"></canvas><p class="caption" data-i18n="captions.i_x"></p></div>
+        <div class="chart-wrap"><canvas id="chartTx"></canvas><p class="caption" data-i18n="captions.t_x"></p></div>
+        <div class="chart-wrap"><canvas id="chartDose"></canvas><p class="caption" data-i18n="captions.dose"></p></div>
+        <div class="chart-wrap"><canvas id="chartSoc"></canvas><p class="caption" data-i18n="captions.soc"></p></div>
+        <div class="chart-wrap"><canvas id="chartBurst"></canvas><p class="caption" data-i18n="captions.burst"></p></div>
+        <div class="chart-wrap"><canvas id="chartFsm"></canvas><p class="caption" data-i18n="captions.fsm"></p></div>
       </div>
     </section>
 
@@ -227,6 +305,7 @@
       <h1 data-i18n="bowl.title">Akustik-Schale</h1>
       <span class="badge calib" data-i18n="bowl.badge">Kalibrierung</span>
       <p class="hint" data-i18n="bowl.intro"></p>
+      <p class="hint" data-i18n="bowl.intro_wiring"></p>
     </div>
 
     <div class="bowl-grid">
@@ -260,7 +339,9 @@
 
         <details open class="collapsible">
           <summary data-i18n="bowl.sec_drive">Ansteuerung / Last</summary>
+          <p class="hint" data-i18n="bowl.hint_drive"></p>
           <label><span data-i18n="bowl.drive">Drive</span>
+            <span class="info" data-i18n-title="bowl.help_drive" title="">?</span>
             <input type="range" id="bowlDrive" min="0.05" max="1" step="0.05" value="1" />
             <span id="bowlDriveVal">1.00</span>
           </label>
@@ -282,6 +363,7 @@
 
         <details open class="collapsible">
           <summary data-i18n="bowl.sec_materials">Materialien</summary>
+          <p class="hint" data-i18n="bowl.hint_materials"></p>
           <label><span data-i18n="bowl.piezo_mat">Piezo</span>
             <select id="bowlPiezoMat">
               <option value="pzt4">PZT-4</option>
@@ -315,30 +397,87 @@
 
         <details open class="collapsible">
           <summary data-i18n="bowl.sec_geometry">Geometrie</summary>
-          <label><span data-i18n="bowl.ti_h">Ti thickness</span>
+          <p class="hint" data-i18n="bowl.hint_geometry"></p>
+          <label><span data-i18n="bowl.ti_h">Ti bottom (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_ti" title="">?</span>
             <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
             <small class="help" data-i18n="bowl.help_ti"></small>
           </label>
-          <label><span data-i18n="bowl.ti_d">Ti diameter (mm)</span>
-            <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" />
+          <label><span data-i18n="bowl.cup_outer_d">Cup outer Ø (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_outer" title="">?</span>
+            <input type="number" id="bowlCupOuterD" min="14" max="25" step="0.1" value="19.54" />
+            <small class="help" data-i18n="bowl.help_cup_outer"></small>
+          </label>
+          <label><span data-i18n="bowl.cup_inner_d">Cup inner Ø (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_inner" title="">?</span>
+            <input type="number" id="bowlCupInnerD" min="12" max="22" step="0.1" value="18.5" />
+            <small class="help" data-i18n="bowl.help_cup_inner"></small>
+          </label>
+          <label><span data-i18n="bowl.cup_wall">Cup wall (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_wall" title="">?</span>
+            <input type="number" id="bowlCupWall" min="0.2" max="2" step="0.05" value="0.52" />
+            <small class="help" data-i18n="bowl.help_cup_wall"></small>
+          </label>
+          <label><span data-i18n="bowl.cup_depth">Cup depth (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_depth" title="">?</span>
+            <input type="number" id="bowlCupDepth" min="1" max="15" step="0.5" value="4" />
+            <small class="help" data-i18n="bowl.help_cup_depth"></small>
+          </label>
+          <label><span data-i18n="bowl.ti_d">Radiating Ø (mm)</span>
+            <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" readonly />
             <small class="help" data-i18n="bowl.help_dia"></small>
           </label>
           <label><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_piezo" title="">?</span>
             <input type="number" id="bowlPiezoH" min="0.05" max="2.5" step="0.005" value="" placeholder="auto λ/2" />
             <label class="check"><input type="checkbox" id="bowlPiezoAuto" checked />
               <span data-i18n="bowl.piezo_h_auto">Auto</span></label>
             <small class="help" data-i18n="bowl.help_piezo"></small>
           </label>
           <label><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_piezo_d" title="">?</span>
             <input type="number" id="bowlPiezoD" min="10" max="19.54" step="0.1" value="18" />
+            <small class="help" data-i18n="bowl.help_piezo_d"></small>
           </label>
           <label><span data-i18n="bowl.glue_h">Glue (µm)</span>
+            <span class="info" data-i18n-title="bowl.help_glue" title="">?</span>
             <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
             <small class="help" data-i18n="bowl.help_glue"></small>
           </label>
           <label><span data-i18n="bowl.gel_h">Gel (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_gel" title="">?</span>
             <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
+            <small class="help" data-i18n="bowl.help_gel"></small>
           </label>
+        </details>
+
+        <details open class="collapsible">
+          <summary data-i18n="bowl.sec_electrode">Elektroden / PCB</summary>
+          <p class="hint" data-i18n="bowl.hint_electrode"></p>
+          <label><span data-i18n="bowl.pcb_v">PCB drive V</span>
+            <span class="info" data-i18n-title="bowl.help_pcb_v" title="">?</span>
+            <input type="number" id="bowlPcbV" min="5" max="80" step="1" value="40" />
+            <small class="help" data-i18n="bowl.help_pcb_v"></small>
+          </label>
+          <label><span data-i18n="bowl.r_wire">R_wire piezo (Ω)</span>
+            <span class="info" data-i18n-title="bowl.help_r_wire" title="">?</span>
+            <input type="number" id="bowlRWire" min="0.01" max="20" step="0.05" value="0.5" />
+            <small class="help" data-i18n="bowl.help_r_wire"></small>
+          </label>
+          <label><span data-i18n="bowl.r_ti">R_Ti return (Ω)</span>
+            <span class="info" data-i18n-title="bowl.help_r_ti" title="">?</span>
+            <input type="number" id="bowlRTi" min="0.01" max="20" step="0.05" value="0.2" />
+            <small class="help" data-i18n="bowl.help_r_ti"></small>
+          </label>
+          <label><span data-i18n="bowl.stack_eff">Stack η</span>
+            <span class="info" data-i18n-title="bowl.help_stack_eff" title="">?</span>
+            <input type="number" id="bowlStackEff" min="0.3" max="0.95" step="0.01" value="0.65" />
+            <small class="help" data-i18n="bowl.help_stack_eff"></small>
+          </label>
+          <label class="check"><input type="checkbox" id="bowlDroplet" />
+            <span data-i18n="bowl.droplet">Droplet demo</span>
+            <span class="info" data-i18n-title="bowl.help_droplet" title="">?</span></label>
+          <small class="help" data-i18n="bowl.help_droplet"></small>
         </details>
 
         <details class="collapsible">
@@ -406,49 +545,60 @@
 
       <section class="panel bowl-viz">
         <h2 data-i18n="bowl.schematic">Schematic</h2>
+        <p class="hint" data-i18n="bowl.hint_schematic"></p>
         <p class="hint" data-i18n="bowl.dual_scale"></p>
-        <svg id="bowlSvg" viewBox="0 0 640 320" class="bowl-svg" role="img"></svg>
+        <svg id="bowlSvg" viewBox="0 0 720 420" class="bowl-svg" role="img"></svg>
+        <p class="caption" id="bowlDropletCaption" data-i18n="bowl.caption_droplet"></p>
       </section>
 
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.spectrum">Spectrum</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlSpectrum"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_spectrum"></p>
       </section>
 
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.sweep_glue">Glue sweep</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlGlue"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_glue"></p>
       </section>
 
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.sweep_ti">Ti sweep</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlTi"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_ti"></p>
       </section>
 
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.energy">Energy</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlEnergy"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_energy"></p>
       </section>
 
       <section class="panel bowl-chart wide">
         <h2 data-i18n="bowl.field">Near-field</h2>
         <div class="chart-wrap field-wrap"><canvas id="chartBowlField"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_field"></p>
       </section>
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.sweep_dia">Piezo-Durchmesser</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlDia"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_dia"></p>
       </section>
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.sweep_f0">f0 Vergleich 1/3/10/19</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlF0"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_f0"></p>
       </section>
       <section class="panel bowl-chart wide">
         <h2 data-i18n="bowl.profile">Druckprofil (1D)</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlProfile"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_profile"></p>
       </section>
       <section class="panel bowl-chart">
         <h2 data-i18n="bowl.phase">Phase Z_in / T</h2>
         <div class="chart-wrap tall"><canvas id="chartBowlPhase"></canvas></div>
+        <p class="caption" data-i18n="bowl.caption_phase"></p>
       </section>
     </div>
   </main>

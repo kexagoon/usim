@@ -187,3 +187,71 @@ def test_matching_and_backing_layers():
     assert "matching" in names
     assert "backing" in names
     assert "water" in names
+
+
+def test_stack_order_piezo_glue_ti_load():
+    bowl = AcousticBowl(default_bowl_params())
+    names = [ly.name for ly in bowl.build_layers()]
+    # Drop optional backing; require piezo → glue → ti_bottom before load
+    core = [n for n in names if n != "backing"]
+    assert core[0] == "pzt"
+    assert core[1] == "glue"
+    assert core[2] == "ti_bottom"
+    assert core[-1] in ("gel", "tissue", "water", "fat", "bone", "air")
+    # gel_tissue ends with tissue after gel
+    assert "ti_bottom" in names
+    assert names.index("pzt") < names.index("glue") < names.index("ti_bottom")
+
+
+def test_air_radiates_near_zero():
+    p = bowl_params_from_dict({"load": "air", "drive_level": 1.0})
+    e = AcousticBowl(p).energy_partition()
+    assert e.p_radiated_w == 0.0
+    assert e.efficiency == 0.0
+
+
+def test_cup_geometry_loads_from_yaml():
+    p = default_bowl_params()
+    assert p.cup_inner_diameter_m > 0
+    assert p.cup_outer_diameter_m > 0
+    assert p.cup_depth_m > 0
+    assert p.cup_wall_thickness_m > 0
+    assert abs(p.ti_diameter_m - p.cup_outer_diameter_m) < 1e-9
+    # ERA consistency with defaults
+    d_eq = era_equivalent_diameter_m(3.0)
+    assert abs(p.cup_outer_diameter_m - d_eq) < 1e-4
+    geo = AcousticBowl(p).geometry_meta()
+    assert "cup_depth_m" in geo
+    assert geo["stack_order"][0:3] == ["pzt", "glue", "ti_bottom"]
+
+
+def test_electrode_resistance_reduces_radiated_power():
+    base = default_bowl_params()
+    low_r = bowl_params_from_dict(
+        {"r_wire_piezo_ohm": 0.1, "r_ti_return_ohm": 0.1, "load": "gel_tissue"}, base
+    )
+    high_r = bowl_params_from_dict(
+        {"r_wire_piezo_ohm": 15.0, "r_ti_return_ohm": 15.0, "load": "gel_tissue"}, base
+    )
+    e_low = AcousticBowl(low_r).energy_partition()
+    e_high = AcousticBowl(high_r).energy_partition()
+    assert e_low.p_radiated_w > e_high.p_radiated_w
+
+
+def test_cup_params_from_dict_and_api_geometry():
+    p = bowl_params_from_dict(
+        {
+            "cup_inner_diameter_m": 0.017,
+            "cup_outer_diameter_m": 0.01954,
+            "cup_depth_m": 0.005,
+            "droplet_demo": True,
+            "pcb_drive_v": 35.0,
+        }
+    )
+    assert p.cup_depth_m == 0.005
+    assert p.droplet_demo is True
+    assert p.pcb_drive_v == 35.0
+    d = AcousticBowl(p).to_api_dict()
+    assert "geometry" in d
+    assert d["geometry"]["droplet_demo"] is True
+    assert d["params"]["cup_inner_diameter_m"] == 0.017

@@ -1,8 +1,11 @@
-"""Acoustic bowl (чаша) multilayer simulation: PZT → glue → Ti → [match] → load.
+"""Acoustic bowl (чаша) multilayer simulation: piezo → glue → Ti bottom → [match] → load.
 
-1D transfer-matrix / transmission-line model for the titanium face/bowl stack.
-Unpublished geometry lives under CALIBRATION_PRESET (config/calibration_bowl.yaml)
-and is never presented as factory data.
+Titanium is a half-cup / bowl (полустакан): piezo is glued on the INSIDE bottom;
+ultrasound exits the OUTER titanium face toward gel/tissue. Side walls of the cup
+are the electrical return path (PCB ↔ Ti), not the primary radiating surface.
+
+1D transfer-matrix along the radiating axis (cup bottom). Cup depth / wall thickness
+and electrode series R are CALIBRATION_PRESET — never factory facts.
 """
 
 from __future__ import annotations
@@ -88,8 +91,13 @@ class BowlParams:
     piezo_material: str = "pzt8"
     glue_material: str = "glue_epoxy"
     face_material: str = "titanium"
-    ti_thickness_m: float = 3e-4
-    ti_diameter_m: float = 0.01954
+    ti_thickness_m: float = 3e-4  # Ti bottom (radiating) thickness
+    ti_diameter_m: float = 0.01954  # radiating outer face Ø
+    # Half-cup geometry (calibration — not factory)
+    cup_inner_diameter_m: float = 0.0185
+    cup_outer_diameter_m: float = 0.01954
+    cup_wall_thickness_m: float = 0.00052
+    cup_depth_m: float = 0.004
     piezo_thickness_m: float | None = None
     piezo_diameter_m: float = 0.018
     glue_thickness_m: float = 1e-5
@@ -103,6 +111,11 @@ class BowlParams:
     kt: float = 0.64
     spectrum_span: float = 0.15
     calibration: bool = True
+    # Electrode / PCB (series R affect drive efficiency)
+    pcb_drive_v: float = 40.0
+    r_wire_piezo_ohm: float = 0.5
+    r_ti_return_ohm: float = 0.2
+    droplet_demo: bool = False
     # optional material property overrides (calibration)
     piezo_rho: float | None = None
     piezo_c: float | None = None
@@ -114,6 +127,15 @@ class BowlParams:
         if self.piezo_thickness_m is not None and self.piezo_thickness_m > 0:
             return float(self.piezo_thickness_m)
         return suggested_piezo_thickness_m(self.f0_hz, c_pzt)
+
+    def sync_cup_radiator(self) -> None:
+        """Keep radiating Ø consistent with cup outer face / ERA defaults."""
+        if self.cup_outer_diameter_m > 0:
+            self.ti_diameter_m = float(self.cup_outer_diameter_m)
+        if self.cup_inner_diameter_m > 0 and self.cup_outer_diameter_m > self.cup_inner_diameter_m:
+            self.cup_wall_thickness_m = (
+                self.cup_outer_diameter_m - self.cup_inner_diameter_m
+            ) / 2.0
 
 
 @dataclass
@@ -185,15 +207,19 @@ def default_bowl_params(cfg: dict[str, Any] | None = None) -> BowlParams:
     cfg = cfg or _load_bowl_yaml()
     d = cfg["defaults"]
     piezo_h = d.get("piezo_thickness_m")
-    return BowlParams(
+    p = BowlParams(
         f0_hz=validate_f0(float(d["f0_hz"])),
         drive_level=float(d["drive_level"]),
         load=str(d["load"]),
         piezo_material=str(d["piezo_material"]),
         glue_material=str(d["glue_material"]),
         face_material=str(d.get("face_material", "titanium")),
-        ti_thickness_m=float(d["ti_thickness_m"]),
-        ti_diameter_m=float(d["ti_diameter_m"]),
+        ti_thickness_m=float(d.get("ti_bottom_thickness_m", d["ti_thickness_m"])),
+        ti_diameter_m=float(d.get("cup_outer_diameter_m", d["ti_diameter_m"])),
+        cup_inner_diameter_m=float(d.get("cup_inner_diameter_m", 0.0185)),
+        cup_outer_diameter_m=float(d.get("cup_outer_diameter_m", d.get("ti_diameter_m", 0.01954))),
+        cup_wall_thickness_m=float(d.get("cup_wall_thickness_m", 0.00052)),
+        cup_depth_m=float(d.get("cup_depth_m", 0.004)),
         piezo_thickness_m=None if piezo_h is None else float(piezo_h),
         piezo_diameter_m=float(d["piezo_diameter_m"]),
         glue_thickness_m=float(d["glue_thickness_m"]),
@@ -207,7 +233,13 @@ def default_bowl_params(cfg: dict[str, Any] | None = None) -> BowlParams:
         kt=float(d.get("kt", 0.64)),
         spectrum_span=float(d.get("spectrum_span", 0.15)),
         calibration=bool(cfg.get("CALIBRATION_PRESET", True)),
+        pcb_drive_v=float(d.get("pcb_drive_v", 40.0)),
+        r_wire_piezo_ohm=float(d.get("r_wire_piezo_ohm", 0.5)),
+        r_ti_return_ohm=float(d.get("r_ti_return_ohm", 0.2)),
+        droplet_demo=bool(d.get("droplet_demo", False)),
     )
+    p.sync_cup_radiator()
+    return p
 
 
 def _material_groups(mats: dict[str, Any]) -> dict[str, list[str]]:
@@ -259,6 +291,17 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         "d_eq_mm": era_equivalent_diameter_m() * 1e3,
         "loads": ["air", "water", "gel", "soft_tissue", "fat", "bone", "gel_tissue"],
         "backing_options": ["air", "heavy"],
+        "geometry_keys": [
+            "cup_inner_diameter_m",
+            "cup_outer_diameter_m",
+            "cup_wall_thickness_m",
+            "cup_depth_m",
+            "ti_thickness_m",
+            "piezo_diameter_m",
+            "glue_thickness_m",
+        ],
+        "electrode_keys": ["pcb_drive_v", "r_wire_piezo_ohm", "r_ti_return_ohm"],
+        "stack_order": ["pzt", "glue", "ti_bottom", "load"],
     }
 
 
@@ -343,10 +386,16 @@ class AcousticBowl:
         return out
 
     def build_layers(self) -> list[BowlLayer]:
+        """Acoustic axis stack: [backing] → piezo → glue → Ti bottom → [match] → load.
+
+        Cup side walls are electrical return only (not in this 1D path).
+        """
         p = self.params
         mats = self._materials()
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
-        d_piezo = min(p.piezo_diameter_m, p.ti_diameter_m)
+        d_inner = p.cup_inner_diameter_m if p.cup_inner_diameter_m > 0 else p.ti_diameter_m
+        d_outer = p.cup_outer_diameter_m if p.cup_outer_diameter_m > 0 else p.ti_diameter_m
+        d_piezo = min(p.piezo_diameter_m, d_inner, d_outer)
         layers: list[BowlLayer] = []
         # Optional backing behind piezo (affects bandwidth via energy model; shown in schematic)
         if p.backing == "heavy":
@@ -355,7 +404,8 @@ class AcousticBowl:
             [
                 BowlLayer("pzt", mats["pzt"], h_pzt, d_piezo),
                 BowlLayer("glue", mats["glue"], max(p.glue_thickness_m, 1e-9), d_piezo),
-                BowlLayer("face", mats["titanium"], p.ti_thickness_m, p.ti_diameter_m),
+                # Ti bottom of half-cup — primary radiating wall (outer face → load)
+                BowlLayer("ti_bottom", mats["titanium"], p.ti_thickness_m, d_outer),
             ]
         )
         if p.matching_enabled:
@@ -364,11 +414,44 @@ class AcousticBowl:
                     "matching",
                     mats["matching"],
                     max(p.matching_thickness_m, 1e-9),
-                    p.ti_diameter_m,
+                    d_outer,
                 )
             )
-        layers.extend(self._load_layers(mats, p.ti_diameter_m))
+        layers.extend(self._load_layers(mats, d_outer))
         return layers
+
+    def electrode_efficiency(self) -> float:
+        """Simple series contact model: R_wire_piezo + R_ti_return reduce drive efficiency."""
+        r_series = max(0.0, self.params.r_wire_piezo_ohm) + max(
+            0.0, self.params.r_ti_return_ohm
+        )
+        # Educational: assume ~50 Ω nominal piezo branch at resonance
+        r_nom = 50.0
+        return float(r_nom / (r_nom + r_series))
+
+    def geometry_meta(self) -> dict[str, Any]:
+        p = self.params
+        return {
+            "cup_inner_diameter_m": p.cup_inner_diameter_m,
+            "cup_outer_diameter_m": p.cup_outer_diameter_m,
+            "cup_wall_thickness_m": p.cup_wall_thickness_m,
+            "cup_depth_m": p.cup_depth_m,
+            "ti_bottom_thickness_m": p.ti_thickness_m,
+            "piezo_diameter_m": p.piezo_diameter_m,
+            "glue_thickness_m": p.glue_thickness_m,
+            "pcb_drive_v": p.pcb_drive_v,
+            "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
+            "r_ti_return_ohm": p.r_ti_return_ohm,
+            "droplet_demo": p.droplet_demo,
+            "load": p.load,
+            "drive_level": p.drive_level,
+            "stack_order": [
+                ly.name for ly in self.build_layers() if ly.name != "backing"
+            ],
+            "note": (
+                "1D axis: piezo→glue→Ti bottom→load; side walls = Ti return electrode"
+            ),
+        }
 
     def _layer_matrix(self, layer: BowlLayer, f_hz: float) -> np.ndarray:
         mat = layer.material
@@ -563,7 +646,8 @@ class AcousticBowl:
         area_ratio = (math.pi * (min(p.piezo_diameter_m, p.ti_diameter_m) / 2) ** 2) / ERA_M2
         area_ratio = float(np.clip(area_ratio, 0.2, 1.2))
 
-        p_rad = min(P_AC_MAX_W, p_drive * stack_eff * coupling * area_ratio)
+        elec_eff = self.electrode_efficiency()
+        p_rad = min(P_AC_MAX_W, p_drive * stack_eff * coupling * area_ratio * elec_eff)
         remain = max(0.0, p_drive - p_rad)
         w_glue = 0.20 + mismatch_extra
         w_pzt = 0.70
@@ -804,6 +888,7 @@ class AcousticBowl:
                         "backing": "#555",
                         "pzt": "#e6a817",
                         "glue": "#c45c26",
+                        "ti_bottom": "#8a9ba8",
                         "face": "#8a9ba8",
                         "titanium": "#8a9ba8",
                         "matching": "#9b59b6",
@@ -869,6 +954,7 @@ class AcousticBowl:
             "backing": "#555555",
             "pzt": "#e6a817",
             "glue": "#c45c26",
+            "ti_bottom": "#8a9ba8",
             "face": "#8a9ba8",
             "titanium": "#8a9ba8",
             "matching": "#9b59b6",
@@ -927,7 +1013,12 @@ class AcousticBowl:
                 "glue_material": p.glue_material,
                 "face_material": p.face_material,
                 "ti_thickness_m": p.ti_thickness_m,
+                "ti_bottom_thickness_m": p.ti_thickness_m,
                 "ti_diameter_m": p.ti_diameter_m,
+                "cup_inner_diameter_m": p.cup_inner_diameter_m,
+                "cup_outer_diameter_m": p.cup_outer_diameter_m,
+                "cup_wall_thickness_m": p.cup_wall_thickness_m,
+                "cup_depth_m": p.cup_depth_m,
                 "piezo_diameter_m": p.piezo_diameter_m,
                 "glue_thickness_m": p.glue_thickness_m,
                 "gel_thickness_m": p.gel_thickness_m,
@@ -939,6 +1030,11 @@ class AcousticBowl:
                 "kt": p.kt,
                 "spectrum_span": p.spectrum_span,
                 "stack_efficiency": p.stack_efficiency,
+                "pcb_drive_v": p.pcb_drive_v,
+                "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
+                "r_ti_return_ohm": p.r_ti_return_ohm,
+                "droplet_demo": p.droplet_demo,
+                "electrode_efficiency": self.electrode_efficiency(),
                 "piezo_thickness_m": h_pzt,
                 "piezo_thickness_suggested_m": suggested_piezo_thickness_m(
                     f0, mats["pzt"].c_m_s
@@ -989,6 +1085,7 @@ class AcousticBowl:
             "time_of_flight": tof,
             "lambda_m": r.lambda_m,
             "x_half_m": r.half_value_m,
+            "geometry": self.geometry_meta(),
             "anchors": {
                 "era_cm2": ERA_CM2,
                 "i_max_w_cm2": I_MAX_W_CM2,
@@ -1012,7 +1109,12 @@ def bowl_params_from_dict(
         "glue_material": str,
         "face_material": str,
         "ti_thickness_m": float,
+        "ti_bottom_thickness_m": float,  # alias → applied below
         "ti_diameter_m": float,
+        "cup_inner_diameter_m": float,
+        "cup_outer_diameter_m": float,
+        "cup_wall_thickness_m": float,
+        "cup_depth_m": float,
         "piezo_thickness_m": lambda x: None if x is None else float(x),
         "piezo_diameter_m": float,
         "glue_thickness_m": float,
@@ -1025,6 +1127,10 @@ def bowl_params_from_dict(
         "stack_efficiency": float,
         "kt": float,
         "spectrum_span": float,
+        "pcb_drive_v": float,
+        "r_wire_piezo_ohm": float,
+        "r_ti_return_ohm": float,
+        "droplet_demo": bool,
         "piezo_rho": lambda x: None if x is None else float(x),
         "piezo_c": lambda x: None if x is None else float(x),
         "piezo_z_mrayl": lambda x: None if x is None else float(x),
@@ -1033,13 +1139,30 @@ def bowl_params_from_dict(
     }
     for key, caster in mapping.items():
         if key in data and data[key] is not None:
-            setattr(p, key, caster(data[key]))
-    p.piezo_diameter_m = min(p.piezo_diameter_m, p.ti_diameter_m)
+            if key == "ti_bottom_thickness_m":
+                p.ti_thickness_m = float(data[key])
+            else:
+                setattr(p, key, caster(data[key]))
+    # Prefer explicit cup outer as radiator Ø
+    if "cup_outer_diameter_m" in data and data["cup_outer_diameter_m"] is not None:
+        p.ti_diameter_m = float(data["cup_outer_diameter_m"])
+    p.sync_cup_radiator()
+    p.piezo_diameter_m = min(p.piezo_diameter_m, p.cup_inner_diameter_m, p.ti_diameter_m)
     p.glue_thickness_m = float(np.clip(p.glue_thickness_m, 1e-7, 1e-4))
     p.ti_thickness_m = float(np.clip(p.ti_thickness_m, 5e-5, 2e-3))
+    p.cup_depth_m = float(np.clip(p.cup_depth_m, 5e-4, 2e-2))
+    p.cup_inner_diameter_m = float(np.clip(p.cup_inner_diameter_m, 8e-3, 3e-2))
+    p.cup_outer_diameter_m = float(np.clip(p.cup_outer_diameter_m, 1e-2, 3e-2))
+    if p.cup_outer_diameter_m < p.cup_inner_diameter_m:
+        p.cup_outer_diameter_m = p.cup_inner_diameter_m + 2 * max(p.cup_wall_thickness_m, 2e-4)
+    p.sync_cup_radiator()
     p.drive_level = float(np.clip(p.drive_level, 0.0, 1.0))
     p.matching_thickness_m = float(np.clip(p.matching_thickness_m, 1e-6, 5e-4))
     p.spectrum_span = float(np.clip(p.spectrum_span, 0.05, 0.5))
+    p.pcb_drive_v = float(np.clip(p.pcb_drive_v, 1.0, 100.0))
+    p.r_wire_piezo_ohm = float(np.clip(p.r_wire_piezo_ohm, 0.0, 50.0))
+    p.r_ti_return_ohm = float(np.clip(p.r_ti_return_ohm, 0.0, 50.0))
+    p.stack_efficiency = float(np.clip(p.stack_efficiency, 0.1, 1.0))
     p.f0_hz = validate_f0(p.f0_hz)
     if p.backing not in ("air", "heavy"):
         p.backing = "air"

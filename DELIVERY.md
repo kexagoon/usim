@@ -65,3 +65,6 @@ Default bind is `127.0.0.1:8765` (`app.main:main`). If that port is occupied, us
 ```bash
 uvicorn app.main:app --host 127.0.0.1 --port 18765
 ```
+
+
+See also: DELIVERY_CUP_HELP.md (half-cup geometry + UI help/hints pass).
