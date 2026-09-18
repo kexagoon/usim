@@ -128,6 +128,8 @@ class BowlParams:
     piezo_z_mrayl: float | None = None
     face_z_mrayl: float | None = None
     load_z_mrayl: float | None = None
+    # Transient / calib: scales glue attenuation (1 = nominal)
+    glue_attn_scale: float = 1.0
 
     def resolved_piezo_thickness(self, c_pzt: float) -> float:
         if self.piezo_thickness_m is not None and self.piezo_thickness_m > 0:
@@ -272,6 +274,16 @@ def _material_groups(mats: dict[str, Any]) -> dict[str, list[str]]:
     }
 
 
+
+def _thermal_help_block(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Ranges/defaults for lumped thermal–acoustic transient (calib)."""
+    try:
+        from src.bowl_transient import thermal_help
+        return thermal_help(cfg)
+    except Exception:
+        return {"calibration": True, "ranges": cfg.get("ranges_thermal", {}) if cfg else {}}
+
+
 def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
     cfg = cfg or _load_bowl_yaml()
     mats: dict[str, Any] = {}
@@ -315,6 +327,7 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         ],
         "electrode_keys": ["pcb_drive_v", "p_elec_max_w", "r_wire_piezo_ohm", "r_ti_return_ohm", "drive_level"],
         "stack_order": ["pzt", "glue", "ti_bottom", "load"],
+        "thermal": _thermal_help_block(cfg),
     }
 
 
@@ -640,7 +653,9 @@ class AcousticBowl:
         h_glue = p.glue_thickness_m
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
         h_ti = p.ti_thickness_m
-        alpha_glue = mats["glue"].attenuation_np_m_mhz * (f / 1e6)
+        glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
+        glue_scale = max(0.2, min(5.0, glue_scale))
+        alpha_glue = mats["glue"].attenuation_np_m_mhz * glue_scale * (f / 1e6)
         alpha_pzt = mats["pzt"].attenuation_np_m_mhz * (f / 1e6)
         alpha_ti = mats["titanium"].attenuation_np_m_mhz * (f / 1e6)
         loss_glue = 1.0 - math.exp(-4.0 * alpha_glue * h_glue)
@@ -670,7 +685,7 @@ class AcousticBowl:
         elec_eff = self.electrode_efficiency()
         p_rad = min(P_AC_MAX_W, p_drive * stack_eff * coupling * area_ratio * elec_eff)
         remain = max(0.0, p_drive - p_rad)
-        w_glue = 0.20 + mismatch_extra
+        w_glue = (0.20 + mismatch_extra) * (0.7 + 0.3 * glue_scale)
         w_pzt = 0.70
         w_ti = 0.10
         w_sum = w_glue + w_pzt + w_ti
@@ -1159,6 +1174,7 @@ def bowl_params_from_dict(
         "piezo_z_mrayl": lambda x: None if x is None else float(x),
         "face_z_mrayl": lambda x: None if x is None else float(x),
         "load_z_mrayl": lambda x: None if x is None else float(x),
+        "glue_attn_scale": float,
     }
     for key, caster in mapping.items():
         if key in data and data[key] is not None:
@@ -1221,6 +1237,7 @@ def bowl_params_from_dict(
     p.r_wire_piezo_ohm = float(np.clip(p.r_wire_piezo_ohm, 0.0, 50.0))
     p.r_ti_return_ohm = float(np.clip(p.r_ti_return_ohm, 0.0, 50.0))
     p.stack_efficiency = float(np.clip(p.stack_efficiency, 0.1, 1.0))
+    p.glue_attn_scale = float(np.clip(getattr(p, "glue_attn_scale", 1.0) or 1.0, 0.2, 5.0))
     p.f0_hz = validate_f0(p.f0_hz)
     if p.backing not in ("air", "heavy"):
         p.backing = "air"

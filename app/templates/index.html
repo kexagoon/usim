@@ -667,6 +667,66 @@
             </div>
           </details>
 
+          <details open class="collapsible" id="secBowlTransient">
+            <summary data-i18n="bowl.sec_transient">Zeitverlauf / Временной ход</summary>
+            <div class="collapsible-body">
+              <p class="hint" data-i18n="bowl.hint_transient"></p>
+              <p class="badge calib" data-i18n="bowl.transient_calib_badge">CALIBRATION — not firmware</p>
+              <label><span data-i18n="bowl.duration">Dauer</span>
+                <select id="bowlDurationPreset">
+                  <option value="10">10 s</option>
+                  <option value="30">30 s</option>
+                  <option value="60" selected>1 min</option>
+                  <option value="120">2 min</option>
+                  <option value="300">5 min</option>
+                  <option value="custom" data-i18n="bowl.duration_custom">Custom…</option>
+                </select>
+              </label>
+              <label id="bowlDurationCustomWrap" class="hidden"><span data-i18n="bowl.duration_s">Dauer (s)</span>
+                <input type="number" id="bowlDurationS" min="1" max="720" step="1" value="60" />
+              </label>
+              <label><span data-i18n="bowl.dt_s">Δt (s)</span>
+                <span class="info" data-i18n-title="bowl.help_dt" title="">?</span>
+                <input type="number" id="bowlDtS" min="0.05" max="0.5" step="0.05" value="0.15" />
+              </label>
+              <label><span data-i18n="bowl.t_amb">T_amb (°C)</span>
+                <input type="number" id="bowlTAmb" min="15" max="40" step="0.5" value="25" />
+              </label>
+              <details class="collapsible nested">
+                <summary data-i18n="bowl.sec_thermal_adv">Thermal advanced (calib)</summary>
+                <div class="collapsible-body">
+                  <label><span data-i18n="bowl.t_warn">T_warn (°C)</span>
+                    <input type="number" id="bowlTWarn" min="40" max="80" step="1" value="55" />
+                  </label>
+                  <label><span data-i18n="bowl.t_off">T_off (°C)</span>
+                    <input type="number" id="bowlTOff" min="50" max="100" step="1" value="70" />
+                  </label>
+                  <label><span data-i18n="bowl.h_conv">h_conv (W/m²K)</span>
+                    <input type="number" id="bowlHConv" min="5" max="80" step="1" value="40" />
+                  </label>
+                  <label><span data-i18n="bowl.k_glue_loss">k_glue_loss (/°C)</span>
+                    <input type="number" id="bowlKGlueLoss" min="0" max="0.1" step="0.001" value="0.025" />
+                  </label>
+                  <label><span data-i18n="bowl.k_eff_drop">k_eff_drop (/°C)</span>
+                    <input type="number" id="bowlKEffDrop" min="0" max="0.02" step="0.0001" value="0.0018" />
+                  </label>
+                  <label><span data-i18n="bowl.k_kt_drop">k_kt_drop (/°C)</span>
+                    <input type="number" id="bowlKKtDrop" min="0" max="0.01" step="0.0001" value="0.0006" />
+                  </label>
+                  <label><span data-i18n="bowl.g_pg">G_piezo↔glue (W/K)</span>
+                    <input type="number" id="bowlGPG" min="0.05" max="5" step="0.05" value="0.35" />
+                  </label>
+                  <label><span data-i18n="bowl.g_gt">G_glue↔Ti (W/K)</span>
+                    <input type="number" id="bowlGGT" min="0.05" max="5" step="0.05" value="0.50" />
+                  </label>
+                  <label class="check"><input type="checkbox" id="bowlDerateSmooth" checked />
+                    <span data-i18n="bowl.derate_smooth">Smooth derate</span>
+                  </label>
+                </div>
+              </details>
+            </div>
+          </details>
+
           <details class="collapsible">
             <summary data-i18n="bowl.sec_compare">A/B Vergleich</summary>
             <div class="collapsible-body">
@@ -712,6 +772,13 @@
           <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.efficiency">η</span><b id="bowlEta">—</b></div>
           <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.tof">TOF</span><b id="bowlTof">—</b></div>
           <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.lambda">λ</span><b id="bowlLam">—</b></div>
+        </div>
+
+        <div class="kpi-strip kpi-transient" id="bowlTransientMetrics" aria-live="polite">
+          <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.dT_piezo">ΔT_piezo</span><b id="bowlDTPiezo">—</b></div>
+          <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.pac_start_end">P_ac start→end</span><b id="bowlPacSE">—</b></div>
+          <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.T_glue_max">max T_glue</span><b id="bowlTGlueMax">—</b></div>
+          <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.derate_min">derate min</span><b id="bowlDerateMin">—</b></div>
         </div>
 
         <section class="bowl-schematic card">
@@ -767,6 +834,26 @@
             <h2 class="card-title" data-i18n="bowl.phase">Phase Z_in / T</h2>
             <div class="chart-wrap tall"><canvas id="chartBowlPhase"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_phase"></p>
+          </section>
+          <section class="chart-card">
+            <h2 class="card-title" data-i18n="bowl.chart_temps">Temperaturen vs Zeit</h2>
+            <div class="chart-wrap tall"><canvas id="chartBowlTemps"></canvas></div>
+            <p class="caption" data-i18n="bowl.caption_temps"></p>
+          </section>
+          <section class="chart-card">
+            <h2 class="card-title" data-i18n="bowl.chart_pac_eta">P_ac &amp; η vs Zeit</h2>
+            <div class="chart-wrap tall"><canvas id="chartBowlPacEta"></canvas></div>
+            <p class="caption" data-i18n="bowl.caption_pac_eta"></p>
+          </section>
+          <section class="chart-card">
+            <h2 class="card-title" data-i18n="bowl.chart_derate">Drive / Derate vs Zeit</h2>
+            <div class="chart-wrap tall"><canvas id="chartBowlDerate"></canvas></div>
+            <p class="caption" data-i18n="bowl.caption_derate"></p>
+          </section>
+          <section class="chart-card">
+            <h2 class="card-title" data-i18n="bowl.chart_losses">Verluste / Kleberfaktor vs Zeit</h2>
+            <div class="chart-wrap tall"><canvas id="chartBowlLosses"></canvas></div>
+            <p class="caption" data-i18n="bowl.caption_losses"></p>
           </section>
         </div>
       </div>

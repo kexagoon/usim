@@ -82,4 +82,4 @@ def test_build_stamp():
     client = TestClient(app)
     r = client.get("/api/build")
     assert r.status_code == 200
-    assert "ui-collapse-power-2026-09-18" in r.json()["usim_build"]
+    assert "bowl-transient-2026-09-18" in r.json()["usim_build"]

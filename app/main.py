@@ -25,6 +25,13 @@ from src.acoustic_bowl import (
     default_bowl_params,
     params_help,
 )
+from src.bowl_transient import (
+    default_thermal_params,
+    run_bowl_transient,
+    suggest_dt,
+    thermal_help,
+    thermal_params_from_dict,
+)
 from src.frequencies import ALLOWED_F0_HZ, frequency_policy_dict, validate_f0
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -44,9 +51,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.1.0-ui-collapse-fix",
-            "usim_build": _os.environ.get("USIM_BUILD", "ui-collapse-power-2026-09-18"),
-            "note": "Collapse fix: hard-hide settings panel 2026-09-18",
+            "version": "1.2.0-bowl-transient",
+            "usim_build": _os.environ.get("USIM_BUILD", "bowl-transient-2026-09-18"),
+            "note": "Akustik-Schale time-dependent thermal-acoustic transient 2026-09-18",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -377,6 +384,8 @@ async def api_preset_save(request: Request) -> JSONResponse:
 # ---------------------------------------------------------------------------
 
 _bowl_params = default_bowl_params()
+_bowl_thermal = default_thermal_params()
+_bowl_transient_cache: dict[str, Any] | None = None
 
 
 class BowlParamsIn(BaseModel):
@@ -415,6 +424,55 @@ class BowlParamsIn(BaseModel):
     piezo_z_mrayl: float | None = None
     face_z_mrayl: float | None = None
     load_z_mrayl: float | None = None
+    # Thermal / transient calib (applied on Analysieren with other settings)
+    t_amb_c: float | None = None
+    t_warn_c: float | None = None
+    t_off_c: float | None = None
+    h_conv_w_m2k: float | None = None
+    g_piezo_glue_w_k: float | None = None
+    g_glue_ti_w_k: float | None = None
+    g_ti_load_w_k: float | None = None
+    k_glue_loss_per_c: float | None = None
+    k_eff_drop_per_c: float | None = None
+    k_kt_drop_per_c: float | None = None
+    k_res_shift_hz_per_c: float | None = None
+    include_load_node: bool | None = None
+    derate_smooth: bool | None = None
+    duration_s: float | None = None
+    dt_s: float | None = None
+
+
+_THERMAL_KEYS = {
+    "t_amb_c",
+    "t_warn_c",
+    "t_off_c",
+    "h_conv_w_m2k",
+    "g_piezo_glue_w_k",
+    "g_glue_ti_w_k",
+    "g_ti_load_w_k",
+    "k_glue_loss_per_c",
+    "k_eff_drop_per_c",
+    "k_kt_drop_per_c",
+    "k_res_shift_hz_per_c",
+    "include_load_node",
+    "derate_smooth",
+}
+
+
+def _split_bowl_payload(data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], float | None, float | None]:
+    """Split acoustic bowl keys vs thermal vs duration/dt."""
+    thermal: dict[str, Any] = {}
+    acoustic: dict[str, Any] = {}
+    duration_s = data.get("duration_s")
+    dt_s = data.get("dt_s")
+    for k, v in data.items():
+        if k in ("duration_s", "dt_s"):
+            continue
+        if k in _THERMAL_KEYS:
+            thermal[k] = v
+        else:
+            acoustic[k] = v
+    return acoustic, thermal, duration_s, dt_s
 
 
 def _get_bowl() -> AcousticBowl:
@@ -423,26 +481,54 @@ def _get_bowl() -> AcousticBowl:
 
 @app.get("/api/bowl/params")
 async def api_bowl_params_get() -> dict[str, Any]:
+    from dataclasses import asdict as _asdict
+
     bowl = _get_bowl()
+    api = bowl.to_api_dict()
+    params_out = dict(api["params"])
+    params_out.update(
+        {
+            k: v
+            for k, v in _asdict(_bowl_thermal).items()
+            if k in _THERMAL_KEYS or k in ("t0_c",)
+        }
+    )
     return {
-        "params": bowl.to_api_dict()["params"],
+        "params": params_out,
+        "thermal": _asdict(_bowl_thermal),
         "help": params_help(),
         "calibration": True,
-        "result": bowl.to_api_dict(),
+        "result": api,
     }
 
 
 @app.post("/api/bowl/params")
 async def api_bowl_params_post(body: BowlParamsIn) -> dict[str, Any]:
-    global _bowl_params
+    global _bowl_params, _bowl_thermal
+    from dataclasses import asdict as _asdict
+
     data = body.model_dump(exclude_none=True)
-    _bowl_params = bowl_params_from_dict(data, _bowl_params)
+    acoustic, thermal, _dur, _dt = _split_bowl_payload(data)
+    if acoustic:
+        _bowl_params = bowl_params_from_dict(acoustic, _bowl_params)
+    if thermal:
+        _bowl_thermal = thermal_params_from_dict(thermal, _bowl_thermal)
     bowl = _get_bowl()
+    api = bowl.to_api_dict()
+    params_out = dict(api["params"])
+    params_out.update(
+        {
+            k: v
+            for k, v in _asdict(_bowl_thermal).items()
+            if k in _THERMAL_KEYS or k in ("t0_c",)
+        }
+    )
     return {
-        "params": bowl.to_api_dict()["params"],
+        "params": params_out,
+        "thermal": _asdict(_bowl_thermal),
         "help": params_help(),
         "calibration": True,
-        "result": bowl.to_api_dict(),
+        "result": api,
     }
 
 
@@ -557,6 +643,65 @@ async def api_bowl_preset(body: BowlPresetIn) -> dict[str, Any]:
 class BowlCompareIn(BaseModel):
     a: dict[str, Any]
     b: dict[str, Any]
+
+
+class BowlTransientIn(BaseModel):
+    duration_s: float = Field(60.0, ge=1.0, le=720.0)
+    dt_s: float | None = Field(None, ge=0.05, le=0.5)
+    t_amb_c: float | None = None
+    t_warn_c: float | None = None
+    t_off_c: float | None = None
+    h_conv_w_m2k: float | None = None
+    g_piezo_glue_w_k: float | None = None
+    g_glue_ti_w_k: float | None = None
+    g_ti_load_w_k: float | None = None
+    k_glue_loss_per_c: float | None = None
+    k_eff_drop_per_c: float | None = None
+    k_kt_drop_per_c: float | None = None
+    k_res_shift_hz_per_c: float | None = None
+    include_load_node: bool | None = None
+    derate_smooth: bool | None = None
+
+
+@app.post("/api/bowl/transient")
+async def api_bowl_transient_post(body: BowlTransientIn) -> dict[str, Any]:
+    """Run coupled thermal-acoustic transient using current bowl params."""
+    global _bowl_thermal, _bowl_transient_cache
+    from dataclasses import asdict as _asdict
+
+    data = body.model_dump(exclude_none=True)
+    duration_s = float(data.pop("duration_s", 60.0))
+    dt_s = data.pop("dt_s", None)
+    if data:
+        _bowl_thermal = thermal_params_from_dict(data, _bowl_thermal)
+    bowl = _get_bowl()
+    result = run_bowl_transient(
+        bowl,
+        duration_s=duration_s,
+        dt_s=dt_s,
+        thermal=_bowl_thermal,
+    )
+    _bowl_transient_cache = result
+    return result
+
+
+@app.get("/api/bowl/transient")
+async def api_bowl_transient_get() -> dict[str, Any]:
+    """Return last transient run cache (empty if none yet)."""
+    from dataclasses import asdict as _asdict
+
+    if _bowl_transient_cache is None:
+        return {
+            "calibration": True,
+            "cached": False,
+            "message": "No transient run yet — POST /api/bowl/transient or Analysieren",
+            "thermal": _asdict(_bowl_thermal),
+            "help": thermal_help(),
+            "suggest_dt_s": suggest_dt(60.0),
+        }
+    out = dict(_bowl_transient_cache)
+    out["cached"] = True
+    return out
 
 
 @app.post("/api/bowl/compare")

@@ -930,3 +930,7 @@ body.settings-collapsed .btn-collapse {
   .main-tabs { width: 100%; justify-content: stretch; }
   .tab-btn { flex: 1; text-align: center; }
 }
+
+.kpi-transient { margin-top: 8px; border-top: 1px dashed var(--border, #334); padding-top: 8px; }
+.badge.calib { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #5c4a1e; color: #ffd866; margin-bottom: 8px; }
+details.nested { margin-top: 8px; border-left: 2px solid var(--border, #445); padding-left: 8px; }

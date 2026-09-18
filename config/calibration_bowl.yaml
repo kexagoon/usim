@@ -293,3 +293,49 @@ notes:
   - "Droplet demo on outer face is educational (atomization cue), not a medical claim."
   - "Allowed f0 = {1,3,10,19} MHz; 1/3 MHz are clinical/LDM-class simulation options."
   - "Matching layer and heavy backing are educational what-if options."
+
+# ---------------------------------------------------------------------------
+# Lumped thermal–acoustic transient (CALIBRATION — not factory firmware)
+# Nodes: piezo ↔ glue ↔ Ti bottom [↔ load] + convection to ambient
+# ---------------------------------------------------------------------------
+thermal:
+  label: "Zeitverlauf / Временной ход — Kalibrierungsmodell"
+  t_amb_c: 25.0
+  t0_c: 25.0
+  t_warn_c: 55.0
+  t_off_c: 70.0
+  # Specific heat J/(kg·K)
+  c_piezo_j_kgk: 350.0
+  c_glue_j_kgk: 1500.0
+  c_ti_j_kgk: 526.0
+  c_load_j_kgk: 3400.0
+  # Conduction conductance between nodes (W/K) — editable calib
+  g_piezo_glue_w_k: 0.35
+  g_glue_ti_w_k: 0.50
+  g_ti_load_w_k: 0.20
+  # Convection to ambient W/(m²·K)
+  h_conv_w_m2k: 40.0
+  # Temperature coupling coefficients (calib)
+  k_glue_loss_per_c: 0.025      # α_glue *= 1 + k*(T_glue - T0)
+  k_eff_drop_per_c: 0.0018      # stack_eff *= 1 - k*(T_piezo - T0)
+  k_kt_drop_per_c: 0.0006       # kt mild drop with piezo T
+  k_res_shift_hz_per_c: -150.0  # optional resonance drift tracker
+  include_load_node: false
+  derate_smooth: true
+  duration_default_s: 60.0
+  duration_max_s: 720.0         # 12 min
+  dt_default_s: 0.1
+
+ranges_thermal:
+  duration_s: [1, 720]
+  dt_s: [0.05, 0.5]
+  t_amb_c: [15, 40]
+  t_warn_c: [40, 80]
+  t_off_c: [50, 100]
+  h_conv_w_m2k: [5, 80]
+  g_piezo_glue_w_k: [0.05, 5]
+  g_glue_ti_w_k: [0.05, 5]
+  g_ti_load_w_k: [0.01, 3]
+  k_glue_loss_per_c: [0, 0.1]
+  k_eff_drop_per_c: [0, 0.02]
+  k_kt_drop_per_c: [0, 0.01]
