@@ -221,23 +221,99 @@
     if (name === "bowl") { ensureBowl(); analyzeBowl(); }
   }
 
-  function syncCupRadiatorField() {
-    if (!$("bowlCupOuterD") || !$("bowlTiD")) return;
+  function mmOr(id, fallback) {
+    const el = $(id);
+    if (!el) return fallback;
+    const v = parseFloat(el.value);
+    return Number.isNaN(v) ? fallback : v;
+  }
+
+  function eraFromDiameterMm(dMm) {
+    const dM = dMm * 1e-3;
+    return Math.PI * (dM / 2) * (dM / 2) * 1e4;
+  }
+
+  function diameterMmFromEra(eraCm2) {
+    return 2.0 * Math.sqrt((eraCm2 * 1e-4) / Math.PI) * 1e3;
+  }
+
+  function syncWallFromInnerOuter() {
+    if (!$("bowlCupInnerD") || !$("bowlCupWall") || !$("bowlCupOuterD")) return;
     const outer = parseFloat($("bowlCupOuterD").value);
-    if (!Number.isNaN(outer)) $("bowlTiD").value = outer.toFixed(2);
-    if ($("bowlCupInnerD") && $("bowlCupWall")) {
-      const inner = parseFloat($("bowlCupInnerD").value);
-      if (!Number.isNaN(inner) && outer > inner) {
-        $("bowlCupWall").value = (((outer - inner) / 2)).toFixed(2);
-      }
+    const inner = parseFloat($("bowlCupInnerD").value);
+    if (!Number.isNaN(inner) && !Number.isNaN(outer) && outer > inner) {
+      $("bowlCupWall").value = (((outer - inner) / 2)).toFixed(2);
+    } else if (!Number.isNaN(outer) && !Number.isNaN(inner) && inner >= outer) {
+      const wall = Math.max(0.2, Math.min(outer * 0.08, 0.5));
+      const newInner = Math.max(8, outer - 2 * wall);
+      $("bowlCupInnerD").value = newInner.toFixed(2);
+      $("bowlCupWall").value = (((outer - newInner) / 2)).toFixed(2);
     }
   }
 
-  function bowlPayload() {
+  /** Link Titan-Ø ↔ cup outer; optionally refresh ERA from diameter. */
+  function syncRadiatingDiameter(source) {
+    const tiEl = $("bowlTiD");
+    const outerEl = $("bowlCupOuterD");
+    const eraEl = $("bowlEra");
+    if (!tiEl) return;
+    let dMm;
+    if (source === "era" && eraEl) {
+      const era = parseFloat(eraEl.value);
+      if (Number.isNaN(era) || era <= 0) return;
+      dMm = diameterMmFromEra(era);
+      tiEl.value = dMm.toFixed(2);
+      if (outerEl) outerEl.value = dMm.toFixed(2);
+    } else if (source === "outer" && outerEl) {
+      dMm = parseFloat(outerEl.value);
+      if (Number.isNaN(dMm)) return;
+      tiEl.value = dMm.toFixed(2);
+      if (eraEl) eraEl.value = eraFromDiameterMm(dMm).toFixed(2);
+    } else {
+      dMm = parseFloat(tiEl.value);
+      if (Number.isNaN(dMm)) return;
+      if (outerEl) outerEl.value = dMm.toFixed(2);
+      if (eraEl) eraEl.value = eraFromDiameterMm(dMm).toFixed(2);
+    }
+    syncWallFromInnerOuter();
+    clampPiezoDiameter(true);
+  }
+
+  /** Piezo Ø ≤ min(inner cup, radiating Ø); show hint when clamped. */
+  function clampPiezoDiameter(showHint) {
+    const piezoEl = $("bowlPiezoD");
+    const hint = $("bowlPiezoClampHint");
+    if (!piezoEl) return;
+    const piezo = parseFloat(piezoEl.value);
+    const inner = mmOr("bowlCupInnerD", 18.5);
+    const rad = mmOr("bowlTiD", mmOr("bowlCupOuterD", 19.54));
+    const limit = Math.min(inner, rad);
+    piezoEl.max = String(limit.toFixed(2));
+    if (Number.isNaN(piezo)) return;
+    if (piezo > limit + 1e-9) {
+      piezoEl.value = limit.toFixed(1);
+      if (hint && showHint) {
+        hint.classList.remove("hidden");
+        const tmpl = t("bowl.hint_piezo_clamp");
+        hint.textContent = (tmpl && tmpl !== "bowl.hint_piezo_clamp")
+          ? tmpl.replace("{limit}", limit.toFixed(1))
+          : ("Piezo Ø clamped to " + limit.toFixed(1) + " mm (≤ min(inner, radiating)).");
+      }
+    } else if (hint && showHint !== false) {
+      hint.classList.add("hidden");
+    }
+  }
+
+  function syncCupRadiatorField() {
+    syncRadiatingDiameter("outer");
+  }
+
+  function collectBowlParams() {
     const auto = $("bowlPiezoAuto").checked;
     const piezoH = $("bowlPiezoH").value;
-    syncCupRadiatorField();
-    const outerMm = parseFloat(($("bowlCupOuterD") || $("bowlTiD")).value);
+    clampPiezoDiameter(false);
+    const dMm = mmOr("bowlTiD", mmOr("bowlCupOuterD", 19.54));
+    const era = $("bowlEra") ? mmOr("bowlEra", eraFromDiameterMm(dMm)) : eraFromDiameterMm(dMm);
     return {
       f0_hz: parseFloat($("bowlF0").value),
       drive_level: parseFloat($("bowlDrive").value),
@@ -247,11 +323,11 @@
       face_material: $("bowlFaceMat").value,
       ti_thickness_m: parseFloat($("bowlTiH").value) * 1e-3,
       ti_bottom_thickness_m: parseFloat($("bowlTiH").value) * 1e-3,
-      ti_diameter_m: outerMm * 1e-3,
-      cup_outer_diameter_m: outerMm * 1e-3,
-      cup_inner_diameter_m: parseFloat(($("bowlCupInnerD") || { value: 18.5 }).value) * 1e-3,
-      cup_wall_thickness_m: parseFloat(($("bowlCupWall") || { value: 0.52 }).value) * 1e-3,
-      cup_depth_m: parseFloat(($("bowlCupDepth") || { value: 4 }).value) * 1e-3,
+      ti_diameter_m: dMm * 1e-3,
+      cup_outer_diameter_m: dMm * 1e-3,
+      cup_inner_diameter_m: mmOr("bowlCupInnerD", 18.5) * 1e-3,
+      cup_wall_thickness_m: mmOr("bowlCupWall", 0.52) * 1e-3,
+      cup_depth_m: mmOr("bowlCupDepth", 4) * 1e-3,
       piezo_thickness_m: auto || piezoH === "" ? null : parseFloat(piezoH) * 1e-3,
       piezo_diameter_m: parseFloat($("bowlPiezoD").value) * 1e-3,
       glue_thickness_m: parseFloat($("bowlGlueH").value) * 1e-6,
@@ -260,6 +336,7 @@
       matching_material: $("bowlMatchMat").value,
       matching_thickness_m: parseFloat($("bowlMatchH").value) * 1e-6,
       backing: $("bowlBacking").value,
+      era_cm2: era,
       kt: parseFloat($("bowlKt").value),
       spectrum_span: parseFloat($("bowlSpan").value),
       pcb_drive_v: parseFloat(($("bowlPcbV") || { value: 40 }).value),
@@ -268,6 +345,10 @@
       stack_efficiency: parseFloat(($("bowlStackEff") || { value: 0.65 }).value),
       droplet_demo: !!($("bowlDroplet") && $("bowlDroplet").checked),
     };
+  }
+
+  function bowlPayload() {
+    return collectBowlParams();
   }
 
   function syncBowlFreqChips() {
@@ -288,13 +369,18 @@
     $("bowlGlueMat").value = p.glue_material || "glue_epoxy";
     if ($("bowlFaceMat")) $("bowlFaceMat").value = p.face_material || "titanium";
     $("bowlTiH").value = ((p.ti_thickness_m || 3e-4) * 1e3).toFixed(2);
-    const outer = p.cup_outer_diameter_m || p.ti_diameter_m || 0.01954;
+    const outer = p.ti_diameter_m || p.cup_outer_diameter_m || 0.01954;
     $("bowlTiD").value = (outer * 1e3).toFixed(2);
     if ($("bowlCupOuterD")) $("bowlCupOuterD").value = (outer * 1e3).toFixed(2);
+    if ($("bowlEra")) {
+      const era = (p.era_cm2 != null) ? p.era_cm2 : eraFromDiameterMm(outer * 1e3);
+      $("bowlEra").value = Number(era).toFixed(2);
+    }
     if ($("bowlCupInnerD")) $("bowlCupInnerD").value = ((p.cup_inner_diameter_m || 0.0185) * 1e3).toFixed(2);
     if ($("bowlCupWall")) $("bowlCupWall").value = ((p.cup_wall_thickness_m || 0.00052) * 1e3).toFixed(2);
     if ($("bowlCupDepth")) $("bowlCupDepth").value = ((p.cup_depth_m || 0.004) * 1e3).toFixed(1);
     $("bowlPiezoD").value = ((p.piezo_diameter_m || 0.018) * 1e3).toFixed(1);
+    clampPiezoDiameter(false);
     $("bowlGlueH").value = ((p.glue_thickness_m || 1e-5) * 1e6).toFixed(0);
     $("bowlGelH").value = ((p.gel_thickness_m || 3e-4) * 1e3).toFixed(2);
     if ($("bowlMatchEn")) $("bowlMatchEn").checked = !!p.matching_enabled;
@@ -654,8 +740,12 @@
   });
   $("bowlDrive").addEventListener("input", (e) => { $("bowlDriveVal").textContent = Number(e.target.value).toFixed(2); });
   $("bowlPiezoAuto").addEventListener("change", (e) => { $("bowlPiezoH").disabled = e.target.checked; });
-  if ($("bowlCupOuterD")) $("bowlCupOuterD").addEventListener("input", syncCupRadiatorField);
-  if ($("bowlCupInnerD")) $("bowlCupInnerD").addEventListener("input", syncCupRadiatorField);
+  if ($("bowlTiD")) $("bowlTiD").addEventListener("input", () => syncRadiatingDiameter("ti"));
+  if ($("bowlCupOuterD")) $("bowlCupOuterD").addEventListener("input", () => syncRadiatingDiameter("outer"));
+  if ($("bowlEra")) $("bowlEra").addEventListener("input", () => syncRadiatingDiameter("era"));
+  if ($("bowlCupInnerD")) $("bowlCupInnerD").addEventListener("input", () => { syncWallFromInnerOuter(); clampPiezoDiameter(true); });
+  if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("input", () => clampPiezoDiameter(true));
+  if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("change", () => clampPiezoDiameter(true));
   $("btnBowlAnalyze").addEventListener("click", analyzeBowl);
   $("btnBowlReset").addEventListener("click", resetBowl);
   document.querySelectorAll("#bowlFreqChips .chip").forEach((c) => c.addEventListener("click", () => {

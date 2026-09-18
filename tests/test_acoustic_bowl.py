@@ -255,3 +255,26 @@ def test_cup_params_from_dict_and_api_geometry():
     assert "geometry" in d
     assert d["geometry"]["droplet_demo"] is True
     assert d["params"]["cup_inner_diameter_m"] == 0.017
+
+
+def test_custom_ti_diameter_accepted():
+    """User-editable Titan-Durchmesser must not snap back to ERA default 19.54 mm."""
+    import math
+
+    p = bowl_params_from_dict(
+        {"ti_diameter_m": 0.016},
+        default_bowl_params(),
+    )
+    assert abs(p.ti_diameter_m - 0.016) < 1e-9
+    assert abs(p.cup_outer_diameter_m - 0.016) < 1e-9
+    assert abs(p.ti_diameter_m - 0.01954) > 1e-4
+    era = math.pi * (0.016 / 2) ** 2 * 1e4
+    assert abs(p.era_cm2 - era) < 1e-6
+    assert p.piezo_diameter_m <= min(p.cup_inner_diameter_m, p.ti_diameter_m)
+
+
+def test_era_updates_equivalent_diameter():
+    p = bowl_params_from_dict({"era_cm2": 2.0}, default_bowl_params())
+    d_eq = era_equivalent_diameter_m(2.0)
+    assert abs(p.ti_diameter_m - d_eq) < 1e-9
+    assert abs(p.cup_outer_diameter_m - d_eq) < 1e-9

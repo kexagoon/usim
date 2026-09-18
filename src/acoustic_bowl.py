@@ -54,6 +54,11 @@ def era_equivalent_diameter_m(era_cm2: float = ERA_CM2) -> float:
     return 2.0 * math.sqrt((era_cm2 * 1e-4) / math.pi)
 
 
+def diameter_to_era_cm2(diameter_m: float) -> float:
+    """Circular ERA (cm²) from radiating diameter (m): π(d/2)² in cm²."""
+    return math.pi * (max(diameter_m, 0.0) / 2.0) ** 2 * 1e4
+
+
 @dataclass
 class Material:
     name: str
@@ -129,9 +134,15 @@ class BowlParams:
         return suggested_piezo_thickness_m(self.f0_hz, c_pzt)
 
     def sync_cup_radiator(self) -> None:
-        """Keep radiating Ø consistent with cup outer face / ERA defaults."""
-        if self.cup_outer_diameter_m > 0:
+        """Keep radiating Ø linked with cup outer face; derive wall from inner/outer."""
+        # Prefer positive values; keep ti_diameter and cup_outer equal (linked).
+        if self.ti_diameter_m > 0 and self.cup_outer_diameter_m > 0:
+            # Already linked by caller; recompute wall if possible
+            pass
+        elif self.cup_outer_diameter_m > 0:
             self.ti_diameter_m = float(self.cup_outer_diameter_m)
+        elif self.ti_diameter_m > 0:
+            self.cup_outer_diameter_m = float(self.ti_diameter_m)
         if self.cup_inner_diameter_m > 0 and self.cup_outer_diameter_m > self.cup_inner_diameter_m:
             self.cup_wall_thickness_m = (
                 self.cup_outer_diameter_m - self.cup_inner_diameter_m
@@ -1143,18 +1154,52 @@ def bowl_params_from_dict(
                 p.ti_thickness_m = float(data[key])
             else:
                 setattr(p, key, caster(data[key]))
-    # Prefer explicit cup outer as radiator Ø
-    if "cup_outer_diameter_m" in data and data["cup_outer_diameter_m"] is not None:
-        p.ti_diameter_m = float(data["cup_outer_diameter_m"])
-    p.sync_cup_radiator()
+
+    has_ti = "ti_diameter_m" in data and data["ti_diameter_m"] is not None
+    has_outer = "cup_outer_diameter_m" in data and data["cup_outer_diameter_m"] is not None
+    has_era = "era_cm2" in data and data["era_cm2"] is not None
+
+    # Link radiating Ø ↔ cup outer (editable calibration; manufacturer ERA is only default)
+    if has_ti:
+        p.cup_outer_diameter_m = float(p.ti_diameter_m)
+    elif has_outer:
+        p.ti_diameter_m = float(p.cup_outer_diameter_m)
+    elif has_era:
+        # ERA alone drives equivalent diameter
+        p.ti_diameter_m = era_equivalent_diameter_m(float(p.era_cm2))
+        p.cup_outer_diameter_m = float(p.ti_diameter_m)
+
+    p.ti_diameter_m = float(np.clip(p.ti_diameter_m, 1e-2, 3e-2))
+    p.cup_outer_diameter_m = float(p.ti_diameter_m)
+    p.cup_depth_m = float(np.clip(p.cup_depth_m, 5e-4, 2e-2))
+    p.cup_inner_diameter_m = float(np.clip(p.cup_inner_diameter_m, 8e-3, 3e-2))
+
+    # If user shrinks radiating/outer Ø below inner, shrink inner (do not inflate outer)
+    if p.cup_inner_diameter_m >= p.cup_outer_diameter_m:
+        wall = max(min(p.cup_wall_thickness_m, p.cup_outer_diameter_m * 0.08), 1e-4)
+        p.cup_inner_diameter_m = max(8e-3, p.cup_outer_diameter_m - 2.0 * wall)
+        if p.cup_inner_diameter_m >= p.cup_outer_diameter_m:
+            p.cup_inner_diameter_m = p.cup_outer_diameter_m * 0.92
+    p.cup_wall_thickness_m = (
+        p.cup_outer_diameter_m - p.cup_inner_diameter_m
+    ) / 2.0
+
+    # Diameter ↔ ERA: diameter wins when diameter fields present; else ERA drives diameter
+    if has_era and not (has_ti or has_outer):
+        p.era_cm2 = float(np.clip(p.era_cm2, 0.5, 10.0))
+        p.ti_diameter_m = float(np.clip(era_equivalent_diameter_m(p.era_cm2), 1e-2, 3e-2))
+        p.cup_outer_diameter_m = float(p.ti_diameter_m)
+        if p.cup_inner_diameter_m >= p.cup_outer_diameter_m:
+            p.cup_inner_diameter_m = p.cup_outer_diameter_m * 0.92
+            p.cup_wall_thickness_m = (
+                p.cup_outer_diameter_m - p.cup_inner_diameter_m
+            ) / 2.0
+    else:
+        p.era_cm2 = float(np.clip(diameter_to_era_cm2(p.ti_diameter_m), 0.5, 10.0))
+
     p.piezo_diameter_m = min(p.piezo_diameter_m, p.cup_inner_diameter_m, p.ti_diameter_m)
     p.glue_thickness_m = float(np.clip(p.glue_thickness_m, 1e-7, 1e-4))
     p.ti_thickness_m = float(np.clip(p.ti_thickness_m, 5e-5, 2e-3))
-    p.cup_depth_m = float(np.clip(p.cup_depth_m, 5e-4, 2e-2))
-    p.cup_inner_diameter_m = float(np.clip(p.cup_inner_diameter_m, 8e-3, 3e-2))
-    p.cup_outer_diameter_m = float(np.clip(p.cup_outer_diameter_m, 1e-2, 3e-2))
-    if p.cup_outer_diameter_m < p.cup_inner_diameter_m:
-        p.cup_outer_diameter_m = p.cup_inner_diameter_m + 2 * max(p.cup_wall_thickness_m, 2e-4)
     p.sync_cup_radiator()
     p.drive_level = float(np.clip(p.drive_level, 0.0, 1.0))
     p.matching_thickness_m = float(np.clip(p.matching_thickness_m, 1e-6, 5e-4))

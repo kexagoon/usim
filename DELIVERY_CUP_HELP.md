@@ -34,3 +34,16 @@ BVD: C0, k_eff², Q_air, Q_gel (C1/L1 derived live); Vdrive, η_elec, stack η; 
 ## Tests
 
 `pytest -q` — stack order, air radiates ~0, cup geometry from YAML, electrode R effect.
+
+## Editable Titan-Durchmesser / ERA link (2026-09-18)
+
+**Was locked:** `#bowlTiD` had HTML `readonly` and JS/`bowl_params_from_dict` always overwrote `ti_diameter_m` from cup outer / ERA default (~19.54 mm).
+
+**Fix:**
+- `#bowlTiD` is editable (primary geometry control).
+- Changing Titan-Ø sets `ti_diameter_m` + `cup_outer_diameter_m` and updates `#bowlEra` via π(d/2)².
+- Changing ERA updates equivalent diameter (and outer Ø).
+- Changing cup outer Ø also updates Titan-Ø / ERA.
+- Piezo Ø clamps to ≤ min(inner cup, radiating Ø) with on-screen hint.
+- Help DE+RU: manufacturer ERA≈3 cm² is default only, not a lock.
+- `POST /api/bowl/params` keeps custom `ti_diameter_m` (e.g. 0.016).

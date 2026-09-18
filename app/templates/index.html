@@ -398,54 +398,63 @@
         <details open class="collapsible">
           <summary data-i18n="bowl.sec_geometry">Geometrie</summary>
           <p class="hint" data-i18n="bowl.hint_geometry"></p>
-          <label><span data-i18n="bowl.ti_h">Ti bottom (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_ti" title="">?</span>
+          <div class="field-group primary-group">
+            <label class="field-primary"><span class="label-row"><span data-i18n="bowl.ti_d">Titan-Durchmesser / Radiating Ø (mm)</span>
+              <span class="info" data-i18n-title="bowl.help_dia" title="">?</span></span>
+              <input type="number" id="bowlTiD" class="input-primary" min="10" max="30" step="0.1" value="19.54" />
+              <small class="help" data-i18n="bowl.help_dia"></small>
+            </label>
+            <label><span class="label-row"><span data-i18n="bowl.era">ERA (cm²)</span>
+              <span class="info" data-i18n-title="bowl.help_era" title="">?</span></span>
+              <input type="number" id="bowlEra" min="0.5" max="10" step="0.01" value="3.00" />
+              <small class="help" data-i18n="bowl.help_era"></small>
+            </label>
+          </div>
+          <label><span class="label-row"><span data-i18n="bowl.ti_h">Ti bottom (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_ti" title="">?</span></span>
             <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
             <small class="help" data-i18n="bowl.help_ti"></small>
           </label>
-          <label><span data-i18n="bowl.cup_outer_d">Cup outer Ø (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_cup_outer" title="">?</span>
-            <input type="number" id="bowlCupOuterD" min="14" max="25" step="0.1" value="19.54" />
+          <label><span class="label-row"><span data-i18n="bowl.cup_outer_d">Cup outer Ø (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_outer" title="">?</span></span>
+            <input type="number" id="bowlCupOuterD" min="10" max="30" step="0.1" value="19.54" />
             <small class="help" data-i18n="bowl.help_cup_outer"></small>
           </label>
-          <label><span data-i18n="bowl.cup_inner_d">Cup inner Ø (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_cup_inner" title="">?</span>
-            <input type="number" id="bowlCupInnerD" min="12" max="22" step="0.1" value="18.5" />
+          <label><span class="label-row"><span data-i18n="bowl.cup_inner_d">Cup inner Ø (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_inner" title="">?</span></span>
+            <input type="number" id="bowlCupInnerD" min="8" max="28" step="0.1" value="18.5" />
             <small class="help" data-i18n="bowl.help_cup_inner"></small>
           </label>
-          <label><span data-i18n="bowl.cup_wall">Cup wall (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_cup_wall" title="">?</span>
+          <label><span class="label-row"><span data-i18n="bowl.cup_wall">Cup wall (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_wall" title="">?</span></span>
             <input type="number" id="bowlCupWall" min="0.2" max="2" step="0.05" value="0.52" />
             <small class="help" data-i18n="bowl.help_cup_wall"></small>
           </label>
-          <label><span data-i18n="bowl.cup_depth">Cup depth (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_cup_depth" title="">?</span>
+          <label><span class="label-row"><span data-i18n="bowl.cup_depth">Cup depth (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_cup_depth" title="">?</span></span>
             <input type="number" id="bowlCupDepth" min="1" max="15" step="0.5" value="4" />
             <small class="help" data-i18n="bowl.help_cup_depth"></small>
           </label>
-          <label><span data-i18n="bowl.ti_d">Radiating Ø (mm)</span>
-            <input type="number" id="bowlTiD" min="10" max="25" step="0.1" value="19.54" readonly />
-            <small class="help" data-i18n="bowl.help_dia"></small>
-          </label>
-          <label><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_piezo" title="">?</span>
+          <label><span class="label-row"><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_piezo" title="">?</span></span>
             <input type="number" id="bowlPiezoH" min="0.05" max="2.5" step="0.005" value="" placeholder="auto λ/2" />
             <label class="check"><input type="checkbox" id="bowlPiezoAuto" checked />
               <span data-i18n="bowl.piezo_h_auto">Auto</span></label>
             <small class="help" data-i18n="bowl.help_piezo"></small>
           </label>
-          <label><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_piezo_d" title="">?</span>
-            <input type="number" id="bowlPiezoD" min="10" max="19.54" step="0.1" value="18" />
+          <label><span class="label-row"><span data-i18n="bowl.piezo_d">Piezo diameter (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_piezo_d" title="">?</span></span>
+            <input type="number" id="bowlPiezoD" min="5" max="30" step="0.1" value="18" />
             <small class="help" data-i18n="bowl.help_piezo_d"></small>
+            <small id="bowlPiezoClampHint" class="hint clamp-hint hidden" role="status"></small>
           </label>
-          <label><span data-i18n="bowl.glue_h">Glue (µm)</span>
-            <span class="info" data-i18n-title="bowl.help_glue" title="">?</span>
+          <label><span class="label-row"><span data-i18n="bowl.glue_h">Glue (µm)</span>
+            <span class="info" data-i18n-title="bowl.help_glue" title="">?</span></span>
             <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
             <small class="help" data-i18n="bowl.help_glue"></small>
           </label>
-          <label><span data-i18n="bowl.gel_h">Gel (mm)</span>
-            <span class="info" data-i18n-title="bowl.help_gel" title="">?</span>
+          <label><span class="label-row"><span data-i18n="bowl.gel_h">Gel (mm)</span>
+            <span class="info" data-i18n-title="bowl.help_gel" title="">?</span></span>
             <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
             <small class="help" data-i18n="bowl.help_gel"></small>
           </label>
