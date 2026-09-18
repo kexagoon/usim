@@ -450,23 +450,15 @@ select:focus-visible,
   min-width: 0;
 }
 
-body.settings-collapsed .therapy-layout,
-body.settings-collapsed .bowl-workspace {
-  grid-template-columns: 0 minmax(0, 1fr);
-  gap: 0;
+/* Collapse: hide settings entirely (3 grid children broke the old 2-col trick). */
+body.settings-collapsed .settings-col {
+  display: none !important;
 }
 
-body.settings-collapsed .settings-col {
-  width: 0 !important;
-  max-width: 0 !important;
-  min-width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
-  visibility: hidden;
+body.settings-collapsed .therapy-layout,
+body.settings-collapsed .bowl-workspace {
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 0 !important;
 }
 
 body.settings-collapsed .results-col {
@@ -476,47 +468,50 @@ body.settings-collapsed .results-col {
 }
 
 .settings-reopen {
-  display: none;
-  position: sticky;
-  top: calc(var(--toolbar-h) + 12px);
-  align-self: start;
-  z-index: 25;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
-  padding: 12px 6px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  display: none !important;
+  position: fixed;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 80;
+  writing-mode: horizontal-tb;
+  padding: 10px 14px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  border-left: none;
-  background: var(--panel);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent);
+  color: #fff;
+  box-shadow: var(--shadow);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  gap: 6px;
-  width: 28px;
-  min-height: 120px;
-  justify-content: center;
+  gap: 8px;
+  align-items: center;
+  min-height: auto;
+  width: auto;
 }
 .settings-reopen span[aria-hidden="true"] {
   writing-mode: horizontal-tb;
-  transform: rotate(180deg);
-  font-size: 1rem;
+  transform: none;
+  font-size: 1.1rem;
 }
 body.settings-collapsed .settings-reopen:not([hidden]) {
-  display: inline-flex;
-  align-items: center;
+  display: inline-flex !important;
 }
-/* When collapsed, reopen sits in first column — restore a slim rail */
-body.settings-collapsed .therapy-layout,
-body.settings-collapsed .bowl-workspace {
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: calc(var(--space) * 1.5);
+
+/* Prominent toolbar toggle */
+.btn-collapse {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  font-weight: 700;
 }
-body.settings-collapsed .results-col {
-  grid-column: auto;
+.btn-collapse:hover {
+  filter: brightness(1.08);
+}
+body.settings-collapsed .btn-collapse {
+  background: var(--panel-2) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
 }
 
 .power-presets {
@@ -555,19 +550,13 @@ body.settings-collapsed .results-col {
 @media (max-width: 1199px) {
   body.settings-collapsed .therapy-layout,
   body.settings-collapsed .bowl-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
   body.settings-collapsed .settings-reopen:not([hidden]) {
-    writing-mode: horizontal-tb;
-    transform: none;
-    width: auto;
-    min-height: 0;
-    border-left: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    margin-bottom: 8px;
-  }
-  body.settings-collapsed .settings-reopen span[aria-hidden="true"] {
-    transform: none;
+    left: 50%;
+    bottom: 16px;
+    top: auto;
+    transform: translateX(-50%);
   }
 }
 

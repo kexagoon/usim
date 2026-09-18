@@ -239,6 +239,7 @@
     requestAnimationFrame(() => {
       resizeAllCharts();
       requestAnimationFrame(resizeAllCharts);
+      setSettingsCollapsed(document.body.classList.contains("settings-collapsed"));
     });
   }
 
@@ -724,13 +725,27 @@
   }
 
   function setSettingsCollapsed(collapsed) {
-    document.body.classList.toggle("settings-collapsed", !!collapsed);
+    collapsed = !!collapsed;
+    document.body.classList.toggle("settings-collapsed", collapsed);
     localStorage.setItem(SETTINGS_COLLAPSE_KEY, collapsed ? "1" : "0");
-    ["btnSettingsReopenTherapy", "btnSettingsReopenBowl"].forEach((id) => {
-      const el = $(id);
-      if (el) el.hidden = !collapsed;
+    // Only show reopen for the active tab
+    const therapyOn = !$("tab-therapy") || !$("tab-therapy").classList.contains("hidden");
+    const bowlOn = $("tab-bowl") && !$("tab-bowl").classList.contains("hidden");
+    const rt = $("btnSettingsReopenTherapy");
+    const rb = $("btnSettingsReopenBowl");
+    if (rt) {
+      rt.hidden = !(collapsed && therapyOn);
+      rt.style.display = (collapsed && therapyOn) ? "" : "none";
+    }
+    if (rb) {
+      rb.hidden = !(collapsed && bowlOn);
+      rb.style.display = (collapsed && bowlOn) ? "" : "none";
+    }
+    // Hard-hide settings columns (CSS also hides; belt + suspenders)
+    document.querySelectorAll(".settings-col").forEach((el) => {
+      el.style.display = collapsed ? "none" : "";
     });
-    updateCollapseLabels(!!collapsed);
+    updateCollapseLabels(collapsed);
     resizeAllCharts();
     requestAnimationFrame(resizeAllCharts);
   }
@@ -818,22 +833,23 @@
     if (p.gel_present != null) $("gelPresent").checked = p.gel_present;
     await applySettings();
   });
-  $("bowlDrive").addEventListener("input", (e) => {
-    $("bowlDriveVal").textContent = Number(e.target.value).toFixed(2);
+  if ($("bowlDrive")) $("bowlDrive").addEventListener("input", (e) => {
+    if ($("bowlDriveVal")) $("bowlDriveVal").textContent = Number(e.target.value).toFixed(2);
     syncPowerPresetChips("bowlPowerPresets", e.target.value);
   });
 
-  if ($("btnSettingsCollapse")) {
-    $("btnSettingsCollapse").addEventListener("click", () => {
-      setSettingsCollapsed(!isSettingsCollapsed());
-    });
-  }
-  document.querySelectorAll(".btn-collapse-local").forEach((b) => {
-    b.addEventListener("click", () => setSettingsCollapsed(true));
-  });
-  ["btnSettingsReopenTherapy", "btnSettingsReopenBowl"].forEach((id) => {
-    const el = $(id);
-    if (el) el.addEventListener("click", () => setSettingsCollapsed(false));
+  // Event delegation — collapse must work even if other controls fail to bind
+  document.addEventListener("click", (ev) => {
+    const t = ev.target.closest("#btnSettingsCollapse, .btn-collapse-local, #btnSettingsReopenTherapy, #btnSettingsReopenBowl");
+    if (!t) return;
+    ev.preventDefault();
+    if (t.id === "btnSettingsCollapse") {
+      setSettingsCollapsed(!document.body.classList.contains("settings-collapsed"));
+    } else if (t.classList.contains("btn-collapse-local")) {
+      setSettingsCollapsed(true);
+    } else {
+      setSettingsCollapsed(false);
+    }
   });
   if ($("driveLevel")) {
     $("driveLevel").addEventListener("input", (e) => {
