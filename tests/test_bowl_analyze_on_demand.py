@@ -55,11 +55,11 @@ def test_app_js_analyze_bowl_only_from_button():
     assert bad == [], f"unexpected analyzeBowl triggers: {bad}"
 
 
-def test_build_stamp_analyze_on_demand():
+def test_build_stamp_temps_chart_fix():
     client = TestClient(app)
     r = client.get("/api/build")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.2.3-analyze-on-demand"
-    assert "analyze-on-demand" in body["usim_build"]
-    assert "button-only" in body.get("note", "").lower() or "Analysieren" in body.get("note", "")
+    assert body["version"] == "1.2.4-temps-chart-fix"
+    assert "temps-chart-fix" in body["usim_build"]
+    assert "heating" in body.get("note", "").lower() or "temps" in body.get("note", "").lower()

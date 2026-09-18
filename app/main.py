@@ -51,9 +51,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.2.3-analyze-on-demand",
-            "usim_build": _os.environ.get("USIM_BUILD", "analyze-on-demand-2026-09-18"),
-            "note": "Bowl analysis is button-only (Analysieren); no auto-queue on settings 2026-09-18",
+            "version": "1.2.4-temps-chart-fix",
+            "usim_build": _os.environ.get("USIM_BUILD", "temps-chart-fix-2026-09-18"),
+            "note": "Heating charts (temps/Zeitverlauf) reliable on Analysieren; bumpChart + transient-first 2026-09-18",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),

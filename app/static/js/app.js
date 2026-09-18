@@ -62,6 +62,7 @@
       data: { labels: [], datasets: [{ label, data: [], borderColor: color, backgroundColor: "transparent", borderWidth: 2.5, pointRadius: 0, tension: 0.15 }] },
       options: {
         responsive: true, maintainAspectRatio: false,
+        animation: false,
         interaction: { mode: "index", intersect: false },
         plugins: { legend: { display: true } },
         scales: {
@@ -70,6 +71,15 @@
         },
       },
     });
+  }
+
+
+  function bumpChart(ch) {
+    if (!ch) return;
+    try {
+      if (typeof ch.stop === "function") ch.stop();
+      ch.update("none");
+    } catch (err) { console.warn("bumpChart", err); }
   }
 
   function initTherapyCharts() {
@@ -531,7 +541,7 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 450 },
+        animation: { duration: 0 },
         plugins: {
           legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
           tooltip: {
@@ -569,6 +579,7 @@
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
+        animation: false,
         scales: {
           y: { title: { display: true, text: "P_ac (W)" }, grid: { color: Chart.defaults.borderColor } },
           y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η" } },
@@ -665,7 +676,7 @@
       bowlCharts.losses.data.datasets[3].label = t("bowl.legend_glue_factor");
       bowlCharts.losses.options.scales.x.title.text = t("bowl.time_s");
     }
-    Object.values(bowlCharts).forEach((ch) => ch && ch.update("none"));
+    Object.values(bowlCharts).forEach((ch) => bumpChart(ch));
   }
 
   function drawSchematic(layers, geometry) {
@@ -788,7 +799,7 @@
       if (bowlCharts.energy) {
         bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
         bowlCharts.energy.data.datasets[0].data = data;
-        bowlCharts.energy.update();
+        bumpChart(bowlCharts.energy);
       }
       renderEnergyDetail(allZero ? [0, 0, 0, 0] : parts);
       document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
@@ -834,8 +845,30 @@
         bowlEnergyCache.end = Object.assign({}, bowlEnergyCache.start);
         applyEnergyDoughnut(bowlEnergyPhase);
       } catch (err) { console.warn("energy cache", err); }
+      // Thermal transient first so heating charts are not left last after many Chart.js updates
+      try {
+        const tr = await postJSON("/api/bowl/transient", transientPayload(), signal);
+        renderBowlTransient(tr);
+        const tmOk = $("bowlTransientMetrics");
+        if (tmOk) tmOk.removeAttribute("title");
+      } catch (terr) {
+        if (terr && terr.name === "AbortError") throw terr;
+        console.warn("bowl transient", terr);
+        const hint = String((terr && terr.message) || terr || "transient failed");
+        const tm = $("bowlTransientMetrics");
+        if (tm) tm.setAttribute("title", "Transient: " + hint);
+        if (btn) btn.title = "Transient: " + hint;
+      }
       const span = parseFloat($("bowlSpan") ? $("bowlSpan").value : 0.15);
-      const spec = await getJSON("/api/bowl/spectrum?n=161&span=" + span, signal);
+      const [spec, glue, ti, field, dia, f0c, prof] = await Promise.all([
+        getJSON("/api/bowl/spectrum?n=161&span=" + span, signal),
+        postJSON("/api/bowl/sweep", { kind: "glue", n: 36 }, signal),
+        postJSON("/api/bowl/sweep", { kind: "titanium", n: 36 }, signal),
+        getJSON("/api/bowl/field?nx=48&nr=24", signal),
+        postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 }, signal),
+        postJSON("/api/bowl/sweep", { kind: "f0", n: 4 }, signal),
+        getJSON("/api/bowl/profile?n_per_layer=16", signal),
+      ]);
       if (bowlCharts.spectrum) {
         bowlCharts.spectrum.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
         bowlCharts.spectrum.data.datasets[0].data = spec.t_intensity || [];
@@ -843,58 +876,49 @@
         const z = spec.z_in_mag || [];
         const zMax = Math.max(...z, 1e-9);
         bowlCharts.spectrum.data.datasets[2].data = z.map((v) => v / zMax);
-        bowlCharts.spectrum.update();
+        bumpChart(bowlCharts.spectrum);
       }
       if (bowlCharts.phase) {
         bowlCharts.phase.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
         bowlCharts.phase.data.datasets[0].data = spec.z_in_phase_rad || [];
         bowlCharts.phase.data.datasets[1].data = spec.t_phase_rad || [];
-        bowlCharts.phase.update();
+        bumpChart(bowlCharts.phase);
       }
-      const glue = await postJSON("/api/bowl/sweep", { kind: "glue", n: 36 }, signal);
       if (bowlCharts.glue) {
         bowlCharts.glue.data.labels = (glue.glue_thickness_um || []).map((v) => Number(v).toFixed(1));
         bowlCharts.glue.data.datasets[0].data = glue.p_ac_w || [];
         bowlCharts.glue.data.datasets[1].data = glue.efficiency || [];
-        bowlCharts.glue.update();
+        bumpChart(bowlCharts.glue);
       }
-      const ti = await postJSON("/api/bowl/sweep", { kind: "titanium", n: 36 }, signal);
       if (bowlCharts.ti) {
         bowlCharts.ti.data.labels = (ti.ti_thickness_mm || []).map((v) => Number(v).toFixed(2));
         bowlCharts.ti.data.datasets[0].data = ti.t_at_f0 || [];
         bowlCharts.ti.data.datasets[1].data = (ti.resonance_shift_hz || []).map((v) => v / 1e6);
-        bowlCharts.ti.update();
+        bumpChart(bowlCharts.ti);
       }
-      const field = await getJSON("/api/bowl/field?nx=48&nr=24", signal);
       if (bowlCharts.field && field.i_w_cm2) {
         bowlCharts.field.data.labels = (field.z_mm || []).map((v) => Number(v).toFixed(2));
         bowlCharts.field.data.datasets[0].data = field.i_w_cm2[0] || [];
-        bowlCharts.field.update();
+        bumpChart(bowlCharts.field);
       }
-      const dia = await postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 }, signal);
       if (bowlCharts.dia) {
         bowlCharts.dia.data.labels = (dia.piezo_diameter_mm || []).map((v) => Number(v).toFixed(1));
         bowlCharts.dia.data.datasets[0].data = dia.p_ac_w || [];
         bowlCharts.dia.data.datasets[1].data = dia.i_sata_w_cm2 || [];
-        bowlCharts.dia.update();
+        bumpChart(bowlCharts.dia);
       }
-      const f0c = await postJSON("/api/bowl/sweep", { kind: "f0", n: 4 }, signal);
       if (bowlCharts.f0 && f0c.rows) {
         bowlCharts.f0.data.labels = f0c.rows.map((r) => String(r.f0_mhz));
         bowlCharts.f0.data.datasets[0].data = f0c.rows.map((r) => r.p_ac_w);
         bowlCharts.f0.data.datasets[1].data = f0c.rows.map((r) => r.efficiency);
-        bowlCharts.f0.update();
+        bumpChart(bowlCharts.f0);
       }
-      const prof = await getJSON("/api/bowl/profile?n_per_layer=16", signal);
       if (bowlCharts.profile) {
         bowlCharts.profile.data.labels = (prof.z_mm || []).map((v) => Number(v).toFixed(2));
         bowlCharts.profile.data.datasets[0].data = prof.pressure_abs || [];
-        bowlCharts.profile.update();
+        bumpChart(bowlCharts.profile);
       }
-      // Coupled thermal–acoustic transient (same Analysieren — all settings apply)
-      const tr = await postJSON("/api/bowl/transient", transientPayload(), signal);
-      renderBowlTransient(tr);
-      if (btn) btn.title = "";
+      if (btn && !(btn.title || "").startsWith("Transient:")) btn.title = "";
     } catch (err) {
       if (err && err.name === "AbortError") return;
       console.warn("analyzeBowl", err);
@@ -904,6 +928,15 @@
     } finally {
       bowlAnalyzeBusy = false;
       if (btn) btn.disabled = false;
+    }
+  }
+
+  function clearChartYAutoscale(ch) {
+    if (!ch || !ch.options || !ch.options.scales) return;
+    const y = ch.options.scales.y;
+    if (y) {
+      delete y.min;
+      delete y.max;
     }
   }
 
@@ -934,41 +967,51 @@
       };
     }
     applyEnergyDoughnut(bowlEnergyPhase || "end");
-    const labels = (s.t_s || []).map((v) => Number(v).toFixed(v >= 60 ? 0 : 1));
-    if ($("bowlDTPiezo")) $("bowlDTPiezo").textContent = (sum.dT_piezo_c != null ? Number(sum.dT_piezo_c).toFixed(1) : "—") + " K";
-    if ($("bowlPacSE")) {
-      const a = sum.P_ac_start_w != null ? Number(sum.P_ac_start_w).toFixed(3) : "—";
-      const b = sum.P_ac_end_w != null ? Number(sum.P_ac_end_w).toFixed(3) : "—";
-      $("bowlPacSE").textContent = a + "→" + b + " W";
+    const labels = (s.t_s || []).slice().map((v) => Number(v).toFixed(v >= 60 ? 0 : 1));
+    // KPI strip always when series present
+    if ((s.T_piezo_c || []).length || sum.dT_piezo_c != null) {
+      if ($("bowlDTPiezo")) $("bowlDTPiezo").textContent = (sum.dT_piezo_c != null ? Number(sum.dT_piezo_c).toFixed(1) : "—") + " K";
+      if ($("bowlPacSE")) {
+        const a = sum.P_ac_start_w != null ? Number(sum.P_ac_start_w).toFixed(3) : "—";
+        const b = sum.P_ac_end_w != null ? Number(sum.P_ac_end_w).toFixed(3) : "—";
+        $("bowlPacSE").textContent = a + "→" + b + " W";
+      }
+      if ($("bowlTGlueMax")) $("bowlTGlueMax").textContent = (sum.T_glue_max_c != null ? Number(sum.T_glue_max_c).toFixed(1) : "—") + " °C";
+      if ($("bowlDerateMin")) $("bowlDerateMin").textContent = sum.derate_min != null ? Number(sum.derate_min).toFixed(2) : "—";
     }
-    if ($("bowlTGlueMax")) $("bowlTGlueMax").textContent = (sum.T_glue_max_c != null ? Number(sum.T_glue_max_c).toFixed(1) : "—") + " °C";
-    if ($("bowlDerateMin")) $("bowlDerateMin").textContent = sum.derate_min != null ? Number(sum.derate_min).toFixed(2) : "—";
     if (bowlCharts.temps) {
       bowlCharts.temps.data.labels = labels;
-      bowlCharts.temps.data.datasets[0].data = s.T_piezo_c || [];
-      bowlCharts.temps.data.datasets[1].data = s.T_glue_c || [];
-      bowlCharts.temps.data.datasets[2].data = s.T_ti_c || [];
-      bowlCharts.temps.update();
+      bowlCharts.temps.data.datasets[0].data = (s.T_piezo_c || []).slice();
+      bowlCharts.temps.data.datasets[1].data = (s.T_glue_c || []).slice();
+      bowlCharts.temps.data.datasets[2].data = (s.T_ti_c || []).slice();
+      clearChartYAutoscale(bowlCharts.temps);
+      bumpChart(bowlCharts.temps);
+      try {
+        if (typeof bowlCharts.temps.resize === "function") bowlCharts.temps.resize();
+      } catch (_) { /* ignore */ }
     }
     if (bowlCharts.pacEta) {
       bowlCharts.pacEta.data.labels = labels;
-      bowlCharts.pacEta.data.datasets[0].data = s.P_ac_w || [];
-      bowlCharts.pacEta.data.datasets[1].data = s.eta || [];
-      bowlCharts.pacEta.update();
+      bowlCharts.pacEta.data.datasets[0].data = (s.P_ac_w || []).slice();
+      bowlCharts.pacEta.data.datasets[1].data = (s.eta || []).slice();
+      clearChartYAutoscale(bowlCharts.pacEta);
+      bumpChart(bowlCharts.pacEta);
     }
     if (bowlCharts.derate) {
       bowlCharts.derate.data.labels = labels;
-      bowlCharts.derate.data.datasets[0].data = s.drive_level || [];
-      bowlCharts.derate.data.datasets[1].data = s.derate || [];
-      bowlCharts.derate.update();
+      bowlCharts.derate.data.datasets[0].data = (s.drive_level || []).slice();
+      bowlCharts.derate.data.datasets[1].data = (s.derate || []).slice();
+      clearChartYAutoscale(bowlCharts.derate);
+      bumpChart(bowlCharts.derate);
     }
     if (bowlCharts.losses) {
       bowlCharts.losses.data.labels = labels;
-      bowlCharts.losses.data.datasets[0].data = s.P_piezo_heat_w || [];
-      bowlCharts.losses.data.datasets[1].data = s.P_glue_loss_w || [];
-      bowlCharts.losses.data.datasets[2].data = s.P_ti_loss_w || [];
-      bowlCharts.losses.data.datasets[3].data = s.glue_loss_factor || [];
-      bowlCharts.losses.update();
+      bowlCharts.losses.data.datasets[0].data = (s.P_piezo_heat_w || []).slice();
+      bowlCharts.losses.data.datasets[1].data = (s.P_glue_loss_w || []).slice();
+      bowlCharts.losses.data.datasets[2].data = (s.P_ti_loss_w || []).slice();
+      bowlCharts.losses.data.datasets[3].data = (s.glue_loss_factor || []).slice();
+      clearChartYAutoscale(bowlCharts.losses);
+      bumpChart(bowlCharts.losses);
     }
   }
 
