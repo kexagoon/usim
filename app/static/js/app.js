@@ -12,6 +12,8 @@
   let bowlInited = false;
   let bowlEnergyCache = { start: null, end: null };
   let bowlEnergyPhase = "end";
+  let bowlAnalyzeBusy = false;
+  let bowlAbort = null;
 
   function $(id) { return document.getElementById(id); }
   function t(key) {
@@ -42,8 +44,14 @@
     Chart.defaults.borderColor = cssVar("--chart-grid", "rgba(255,255,255,0.08)");
     Chart.defaults.font.size = 12;
   }
-  async function postJSON(url, body) {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  async function postJSON(url, body, signal) {
+    const opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) };
+    if (signal) opts.signal = signal;
+    const r = await fetch(url, opts);
+    return r.json();
+  }
+  async function getJSON(url, signal) {
+    const r = await fetch(url, signal ? { signal } : undefined);
     return r.json();
   }
   function lineChart(id, label, color) {
@@ -237,7 +245,7 @@
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
     $("tab-therapy").classList.toggle("hidden", name !== "therapy");
     $("tab-bowl").classList.toggle("hidden", name !== "bowl");
-    if (name === "bowl") { ensureBowl(); analyzeBowl(); }
+    if (name === "bowl") { ensureBowl(); }
     requestAnimationFrame(() => {
       resizeAllCharts();
       requestAnimationFrame(resizeAllCharts);
@@ -792,90 +800,111 @@
   }
 
   async function analyzeBowl() {
-    ensureBowl();
-    const posted = await postJSON("/api/bowl/params", bowlPayload());
-    const result = posted.result || (await (await fetch("/api/bowl/analyze")).json());
-    const energy = result.energy || {};
-    $("bowlT").textContent = (result.t_at_f0 ?? 0).toFixed(4);
-    $("bowlR").textContent = (result.r_at_f0 ?? 0).toFixed(4);
-    $("bowlRes").textContent = ((result.resonance_hz || 0) / 1e6).toFixed(3) + " MHz";
-    $("bowlShift").textContent = ((result.resonance_shift_hz || 0) / 1e3).toFixed(1) + " kHz";
-    $("bowlPac").textContent = (energy.p_radiated_w ?? 0).toFixed(3) + " W";
-    $("bowlEta").textContent = ((energy.efficiency ?? 0) * 100).toFixed(1) + " %";
-    if ($("bowlTof") && result.time_of_flight) $("bowlTof").textContent = (result.time_of_flight.total_ns || 0).toFixed(1) + " ns";
-    if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
-    drawSchematic(result.layers || [], result.geometry || result.params || {});
+    if (bowlAnalyzeBusy) return;
+    bowlAnalyzeBusy = true;
+    const btn = $("btnBowlAnalyze");
+    if (btn) btn.disabled = true;
+    if (bowlAbort) {
+      try { bowlAbort.abort(); } catch (_) { /* ignore */ }
+    }
+    bowlAbort = new AbortController();
+    const signal = bowlAbort.signal;
     try {
-      bowlEnergyCache.start = {
-        p_radiated_w: energy.p_radiated_w || 0,
-        p_glue_loss_w: energy.p_glue_loss_w || 0,
-        p_piezo_heat_w: energy.p_piezo_heat_w || 0,
-        p_ti_loss_w: energy.p_ti_loss_w || 0,
-        efficiency: energy.efficiency || 0,
-      };
-      bowlEnergyCache.end = Object.assign({}, bowlEnergyCache.start);
-      applyEnergyDoughnut(bowlEnergyPhase);
-    } catch (err) { console.warn("energy cache", err); }
-    const span = parseFloat($("bowlSpan") ? $("bowlSpan").value : 0.15);
-    const spec = await (await fetch("/api/bowl/spectrum?n=161&span=" + span)).json();
-    if (bowlCharts.spectrum) {
-      bowlCharts.spectrum.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
-      bowlCharts.spectrum.data.datasets[0].data = spec.t_intensity || [];
-      bowlCharts.spectrum.data.datasets[1].data = spec.r_intensity || [];
-      const z = spec.z_in_mag || [];
-      const zMax = Math.max(...z, 1e-9);
-      bowlCharts.spectrum.data.datasets[2].data = z.map((v) => v / zMax);
-      bowlCharts.spectrum.update();
+      ensureBowl();
+      const posted = await postJSON("/api/bowl/params", bowlPayload(), signal);
+      const result = posted.result || (await getJSON("/api/bowl/analyze", signal));
+      const energy = result.energy || {};
+      $("bowlT").textContent = (result.t_at_f0 ?? 0).toFixed(4);
+      $("bowlR").textContent = (result.r_at_f0 ?? 0).toFixed(4);
+      $("bowlRes").textContent = ((result.resonance_hz || 0) / 1e6).toFixed(3) + " MHz";
+      $("bowlShift").textContent = ((result.resonance_shift_hz || 0) / 1e3).toFixed(1) + " kHz";
+      $("bowlPac").textContent = (energy.p_radiated_w ?? 0).toFixed(3) + " W";
+      $("bowlEta").textContent = ((energy.efficiency ?? 0) * 100).toFixed(1) + " %";
+      if ($("bowlTof") && result.time_of_flight) $("bowlTof").textContent = (result.time_of_flight.total_ns || 0).toFixed(1) + " ns";
+      if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
+      drawSchematic(result.layers || [], result.geometry || result.params || {});
+      try {
+        bowlEnergyCache.start = {
+          p_radiated_w: energy.p_radiated_w || 0,
+          p_glue_loss_w: energy.p_glue_loss_w || 0,
+          p_piezo_heat_w: energy.p_piezo_heat_w || 0,
+          p_ti_loss_w: energy.p_ti_loss_w || 0,
+          efficiency: energy.efficiency || 0,
+        };
+        bowlEnergyCache.end = Object.assign({}, bowlEnergyCache.start);
+        applyEnergyDoughnut(bowlEnergyPhase);
+      } catch (err) { console.warn("energy cache", err); }
+      const span = parseFloat($("bowlSpan") ? $("bowlSpan").value : 0.15);
+      const spec = await getJSON("/api/bowl/spectrum?n=161&span=" + span, signal);
+      if (bowlCharts.spectrum) {
+        bowlCharts.spectrum.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
+        bowlCharts.spectrum.data.datasets[0].data = spec.t_intensity || [];
+        bowlCharts.spectrum.data.datasets[1].data = spec.r_intensity || [];
+        const z = spec.z_in_mag || [];
+        const zMax = Math.max(...z, 1e-9);
+        bowlCharts.spectrum.data.datasets[2].data = z.map((v) => v / zMax);
+        bowlCharts.spectrum.update();
+      }
+      if (bowlCharts.phase) {
+        bowlCharts.phase.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
+        bowlCharts.phase.data.datasets[0].data = spec.z_in_phase_rad || [];
+        bowlCharts.phase.data.datasets[1].data = spec.t_phase_rad || [];
+        bowlCharts.phase.update();
+      }
+      const glue = await postJSON("/api/bowl/sweep", { kind: "glue", n: 36 }, signal);
+      if (bowlCharts.glue) {
+        bowlCharts.glue.data.labels = (glue.glue_thickness_um || []).map((v) => Number(v).toFixed(1));
+        bowlCharts.glue.data.datasets[0].data = glue.p_ac_w || [];
+        bowlCharts.glue.data.datasets[1].data = glue.efficiency || [];
+        bowlCharts.glue.update();
+      }
+      const ti = await postJSON("/api/bowl/sweep", { kind: "titanium", n: 36 }, signal);
+      if (bowlCharts.ti) {
+        bowlCharts.ti.data.labels = (ti.ti_thickness_mm || []).map((v) => Number(v).toFixed(2));
+        bowlCharts.ti.data.datasets[0].data = ti.t_at_f0 || [];
+        bowlCharts.ti.data.datasets[1].data = (ti.resonance_shift_hz || []).map((v) => v / 1e6);
+        bowlCharts.ti.update();
+      }
+      const field = await getJSON("/api/bowl/field?nx=48&nr=24", signal);
+      if (bowlCharts.field && field.i_w_cm2) {
+        bowlCharts.field.data.labels = (field.z_mm || []).map((v) => Number(v).toFixed(2));
+        bowlCharts.field.data.datasets[0].data = field.i_w_cm2[0] || [];
+        bowlCharts.field.update();
+      }
+      const dia = await postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 }, signal);
+      if (bowlCharts.dia) {
+        bowlCharts.dia.data.labels = (dia.piezo_diameter_mm || []).map((v) => Number(v).toFixed(1));
+        bowlCharts.dia.data.datasets[0].data = dia.p_ac_w || [];
+        bowlCharts.dia.data.datasets[1].data = dia.i_sata_w_cm2 || [];
+        bowlCharts.dia.update();
+      }
+      const f0c = await postJSON("/api/bowl/sweep", { kind: "f0", n: 4 }, signal);
+      if (bowlCharts.f0 && f0c.rows) {
+        bowlCharts.f0.data.labels = f0c.rows.map((r) => String(r.f0_mhz));
+        bowlCharts.f0.data.datasets[0].data = f0c.rows.map((r) => r.p_ac_w);
+        bowlCharts.f0.data.datasets[1].data = f0c.rows.map((r) => r.efficiency);
+        bowlCharts.f0.update();
+      }
+      const prof = await getJSON("/api/bowl/profile?n_per_layer=16", signal);
+      if (bowlCharts.profile) {
+        bowlCharts.profile.data.labels = (prof.z_mm || []).map((v) => Number(v).toFixed(2));
+        bowlCharts.profile.data.datasets[0].data = prof.pressure_abs || [];
+        bowlCharts.profile.update();
+      }
+      // Coupled thermal–acoustic transient (same Analysieren — all settings apply)
+      const tr = await postJSON("/api/bowl/transient", transientPayload(), signal);
+      renderBowlTransient(tr);
+      if (btn) btn.title = "";
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      console.warn("analyzeBowl", err);
+      if (btn) btn.title = String((err && err.message) || err || "analyze failed");
+      const metrics = $("bowlMetrics");
+      if (metrics) metrics.setAttribute("data-analyze-error", String((err && err.message) || err || "error"));
+    } finally {
+      bowlAnalyzeBusy = false;
+      if (btn) btn.disabled = false;
     }
-    if (bowlCharts.phase) {
-      bowlCharts.phase.data.labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
-      bowlCharts.phase.data.datasets[0].data = spec.z_in_phase_rad || [];
-      bowlCharts.phase.data.datasets[1].data = spec.t_phase_rad || [];
-      bowlCharts.phase.update();
-    }
-    const glue = await postJSON("/api/bowl/sweep", { kind: "glue", n: 36 });
-    if (bowlCharts.glue) {
-      bowlCharts.glue.data.labels = (glue.glue_thickness_um || []).map((v) => Number(v).toFixed(1));
-      bowlCharts.glue.data.datasets[0].data = glue.p_ac_w || [];
-      bowlCharts.glue.data.datasets[1].data = glue.efficiency || [];
-      bowlCharts.glue.update();
-    }
-    const ti = await postJSON("/api/bowl/sweep", { kind: "titanium", n: 36 });
-    if (bowlCharts.ti) {
-      bowlCharts.ti.data.labels = (ti.ti_thickness_mm || []).map((v) => Number(v).toFixed(2));
-      bowlCharts.ti.data.datasets[0].data = ti.t_at_f0 || [];
-      bowlCharts.ti.data.datasets[1].data = (ti.resonance_shift_hz || []).map((v) => v / 1e6);
-      bowlCharts.ti.update();
-    }
-    const field = await (await fetch("/api/bowl/field?nx=48&nr=24")).json();
-    if (bowlCharts.field && field.i_w_cm2) {
-      bowlCharts.field.data.labels = (field.z_mm || []).map((v) => Number(v).toFixed(2));
-      bowlCharts.field.data.datasets[0].data = field.i_w_cm2[0] || [];
-      bowlCharts.field.update();
-    }
-    const dia = await postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 });
-    if (bowlCharts.dia) {
-      bowlCharts.dia.data.labels = (dia.piezo_diameter_mm || []).map((v) => Number(v).toFixed(1));
-      bowlCharts.dia.data.datasets[0].data = dia.p_ac_w || [];
-      bowlCharts.dia.data.datasets[1].data = dia.i_sata_w_cm2 || [];
-      bowlCharts.dia.update();
-    }
-    const f0c = await postJSON("/api/bowl/sweep", { kind: "f0", n: 4 });
-    if (bowlCharts.f0 && f0c.rows) {
-      bowlCharts.f0.data.labels = f0c.rows.map((r) => String(r.f0_mhz));
-      bowlCharts.f0.data.datasets[0].data = f0c.rows.map((r) => r.p_ac_w);
-      bowlCharts.f0.data.datasets[1].data = f0c.rows.map((r) => r.efficiency);
-      bowlCharts.f0.update();
-    }
-    const prof = await (await fetch("/api/bowl/profile?n_per_layer=16")).json();
-    if (bowlCharts.profile) {
-      bowlCharts.profile.data.labels = (prof.z_mm || []).map((v) => Number(v).toFixed(2));
-      bowlCharts.profile.data.datasets[0].data = prof.pressure_abs || [];
-      bowlCharts.profile.update();
-    }
-    // Coupled thermal–acoustic transient (same Analysieren — all settings apply)
-    const tr = await postJSON("/api/bowl/transient", transientPayload());
-    renderBowlTransient(tr);
   }
 
   function renderBowlTransient(tr) {
@@ -949,14 +978,12 @@
     $("bowlPiezoAuto").checked = true;
     $("bowlPiezoH").value = "";
     $("bowlPiezoH").disabled = true;
-    await analyzeBowl();
   }
 
   async function loadBowlPreset(name) {
     const posted = await postJSON("/api/bowl/preset", { name });
     applyBowlParamsToForm(posted.params || {});
     $("bowlPiezoAuto").checked = posted.params && posted.params.piezo_thickness_m == null;
-    await analyzeBowl();
   }
 
   async function runBowlCompare() {
@@ -1143,7 +1170,6 @@
   document.querySelectorAll("#bowlPowerPresets .preset-chip").forEach((b) => {
     b.addEventListener("click", () => {
       setBowlDriveLevel(b.dataset.power);
-      analyzeBowl();
     });
   });
 
@@ -1166,7 +1192,6 @@
   document.querySelectorAll("#bowlFreqChips .chip").forEach((c) => c.addEventListener("click", () => {
     $("bowlF0").value = c.dataset.f0;
     syncBowlFreqChips();
-    analyzeBowl();
   }));
   document.querySelectorAll("#bowlPresets .preset-btn").forEach((b) => b.addEventListener("click", () => loadBowlPreset(b.dataset.preset)));
   if ($("btnBowlCompare")) $("btnBowlCompare").addEventListener("click", runBowlCompare);
