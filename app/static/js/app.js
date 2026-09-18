@@ -214,11 +214,26 @@
   async function refresh() { renderStatus(await (await fetch("/api/status")).json()); }
   async function applySettings() { renderStatus(await postJSON("/api/settings", settingsPayload())); }
 
+  function resizeAllCharts() {
+    const all = [...Object.values(therapyCharts), ...Object.values(bowlCharts)];
+    all.forEach((c) => {
+      if (!c) return;
+      try {
+        if (typeof c.resize === "function") c.resize();
+        else if (typeof c.update === "function") c.update("resize");
+      } catch (_) { /* ignore */ }
+    });
+  }
+
   function switchTab(name) {
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
     $("tab-therapy").classList.toggle("hidden", name !== "therapy");
     $("tab-bowl").classList.toggle("hidden", name !== "bowl");
     if (name === "bowl") { ensureBowl(); analyzeBowl(); }
+    requestAnimationFrame(() => {
+      resizeAllCharts();
+      requestAnimationFrame(resizeAllCharts);
+    });
   }
 
   function mmOr(id, fallback) {
@@ -689,6 +704,7 @@
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem(THEME_KEY, next);
     chartTheme();
+    resizeAllCharts();
   });
   $("modelSelect").addEventListener("change", async () => { await applySettings(); await loadPrograms(); });
   $("programSelect").addEventListener("change", onProgramChange);
@@ -759,6 +775,11 @@
 
   document.documentElement.setAttribute("data-theme", localStorage.getItem(THEME_KEY) || "dark");
   $("bowlPiezoH").disabled = true;
+  let _resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(resizeAllCharts, 120);
+  });
   initTherapyCharts();
   if (localStorage.getItem(LANG_KEY) && localStorage.getItem(LANG_KEY) !== window.__LANG__) setLang(localStorage.getItem(LANG_KEY));
   else applyI18n();

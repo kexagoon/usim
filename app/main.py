@@ -44,8 +44,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.1.0",
-            "usim_build": _os.environ.get("USIM_BUILD", ""),
+            "version": "1.1.0-ui-pro",
+            "usim_build": _os.environ.get("USIM_BUILD", "ui-pro-2026-09-18"),
+            "note": "Professional desktop UI layout 2026-09-18",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
