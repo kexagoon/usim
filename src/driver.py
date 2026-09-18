@@ -11,12 +11,16 @@ from src.piezo_bvd import PiezoBVD, Z_AIR
 @dataclass
 class DriverParams:
     vdrive_peak_v: float = 40.0
+    pcb_drive_v: float = 40.0  # board / source peak (Kalibrierung)
     eta_elec: float = 0.7
     stack_efficiency: float = 0.65
     i_max_w_cm2: float = 0.5
     era_cm2: float = 3.0
     limit_domain: str = "SATA"  # SATA | SAPA
     p_ac_max_w: float = 1.5
+    drive_level: float = 1.0  # 0..1 board power fraction
+    p_elec_max_w: float = 8.0  # electrical power budget (Kalibrierung)
+    i_sense_window_ms: float = 2.0  # current-sense window (Kalibrierung)
 
 
 @dataclass
@@ -58,6 +62,12 @@ class Driver:
         self.params = params or DriverParams()
         self.vdrive_peak = self.params.vdrive_peak_v
 
+    def _board_vpeak(self) -> float:
+        """Peak drive from PCB/source; pcb_drive_v is authoritative when set."""
+        p = self.params
+        base = p.pcb_drive_v if p.pcb_drive_v > 0 else p.vdrive_peak_v
+        return float(base)
+
     def regulate(
         self,
         piezo: PiezoBVD,
@@ -68,7 +78,9 @@ class Driver:
     ) -> DriverOutput:
         st = piezo.evaluate()
         params = self.params
-        i_set = min(i_set_w_cm2, params.i_max_w_cm2)
+        level = max(0.0, min(1.0, float(params.drive_level)))
+        i_set = min(i_set_w_cm2 * level, params.i_max_w_cm2)
+        v_board = self._board_vpeak()
 
         # Without gel: almost no acoustic output → energy into piezo heat
         if force_air or not st.contact or st.z_load <= Z_AIR * 10:
@@ -77,10 +89,10 @@ class Driver:
             i_req = max(i_set, 0.1)
             p_would = min(i_req, params.i_max_w_cm2) * params.era_cm2
             p_bat = p_would / max(params.stack_efficiency * params.eta_elec, 0.05)
-            p_bat = max(2.0, min(p_bat, 5.0))
+            p_bat = max(2.0 * level, min(p_bat, min(5.0, params.p_elec_max_w)))
             p_elec = p_bat * params.eta_elec
             p_piezo_loss = p_elec  # no radiation → full heat load on piezo/face
-            self.vdrive_peak = params.vdrive_peak_v
+            self.vdrive_peak = v_board
             vswr = 10.0
             return DriverOutput(
                 vdrive_peak=self.vdrive_peak,
@@ -116,10 +128,18 @@ class Driver:
         p_bat = p_elec  # already referred through eta_elec in eta_total split
         # More precise: P_bat = P_ac / (stack_eff * eta_elec)
         p_bat = p_ac / max(params.stack_efficiency * params.eta_elec, 0.05)
+        # Clamp to board electrical power budget (Kalibrierung)
+        if p_bat > params.p_elec_max_w > 0:
+            scale = params.p_elec_max_w / p_bat
+            p_bat = params.p_elec_max_w
+            p_ac *= scale
+            i_sata = p_ac / params.era_cm2
+            i_sapa = i_sata / max(duty, 1e-9)
+        p_elec = p_bat * params.eta_elec
         p_piezo_loss = p_bat * params.eta_elec * (1.0 - params.stack_efficiency)
 
-        # Adjust Vdrive proportionally to required I
-        self.vdrive_peak = params.vdrive_peak_v * math.sqrt(
+        # Adjust Vdrive proportionally to required I (board peak = PCB/source)
+        self.vdrive_peak = v_board * math.sqrt(
             max(i_sata, 1e-6) / params.i_max_w_cm2
         )
 

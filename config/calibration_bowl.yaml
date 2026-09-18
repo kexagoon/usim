@@ -232,6 +232,7 @@ defaults:
   spectrum_span: 0.15
   # Electrode / PCB drive (calibration)
   pcb_drive_v: 40.0
+  p_elec_max_w: 8.0
   r_wire_piezo_ohm: 0.5
   r_ti_return_ohm: 0.2
   droplet_demo: false
@@ -250,6 +251,7 @@ ranges:
   cup_wall_thickness_m: [0.0002, 0.002]
   cup_depth_m: [0.001, 0.015]
   pcb_drive_v: [5, 80]
+  p_elec_max_w: [0.5, 50]
   r_wire_piezo_ohm: [0.01, 20]
   r_ti_return_ohm: [0.01, 20]
 

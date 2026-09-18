@@ -2,62 +2,74 @@
 
 ## Goal
 Desktop-first calm professional UI for the Skinova / Wellcomet simulator.
-Functional behaviour and physics APIs unchanged; layout/CSS/structure only
-(plus chart resize hooks). Build stamp: `ui-pro-2026-09-18`.
+Build stamp: `ui-collapse-power-2026-09-18`.
 
 ## Layout summary
 
 ### Global
 - Sticky top toolbar: brand + calibration badge, Therapie | Akustik-Schale tabs,
-  DE|RU, model select, Start/Pause/Reset, Dock/Undock/Write, Theme.
+  DE|RU, model select, Start/Pause/Reset, Dock/Undock/Write, **Einstellungen
+  ausblenden/einblenden**, Theme.
 - Quiet disclaimer strip under toolbar.
 - Dark / light themes with shared 8px spacing scale, rounded cards (8–10px),
   soft borders/shadows, accessible focus rings.
 
+### Collapsible settings (`usim.settingsCollapsed`)
+- Therapy and Bowl: left `.settings-col` toggles via toolbar button
+  `#btnSettingsCollapse` and local «« controls in each sidebar head.
+- Preference persisted in `localStorage` key `usim.settingsCollapsed`.
+- When collapsed: sidebar width 0 / hidden; `.results-col` uses full width;
+  slim vertical reopen tab (`#btnSettingsReopenTherapy` /
+  `#btnSettingsReopenBowl`) on the left edge.
+- After toggle: `resizeAllCharts()` (+ rAF) so Chart.js refits.
+
+### Board / source power («Platine / Quelle»)
+- Therapy accordion `#secBoardSource`: `pcb_drive_v`, `vdrive_peak`, power
+  presets 25/50/75/100%, `drive_level` slider, `eta_elec`, `p_elec_max_w`,
+  `i_sense_window_ms` (Kalibrierung). Help: electronics feed one lead to piezo;
+  return via titanium.
+- Bowl: `#secBowlBoardSource` with `bowlPcbV`, presets (wire to `bowlDrive`),
+  `bowlPElecMax`; existing drive slider kept.
+- Wired to `/api/settings` and `/api/bowl/params`. Physics: `drive_level` scales
+  I_set / bowl drive; `pcb_drive_v` sets board peak (bowl ∝ V²); `p_elec_max_w`
+  clamps P_bat / drive budget.
+
 ### Therapy tab (`#tab-therapy`)
 - **2-column CSS grid** (≥1200px): left sidebar ~380px, right flex.
-- **Left (sticky, scrollable accordion)**:
-  Programm (open), Intensität (open), Piezo/Treiber, Akustik, Operator,
-  Sicherheit 19, Batterie, Selftest, Export — advanced sections collapsed by
-  default via `<details>`. Contraindications note at bottom.
-- **Right**:
-  - Live KPI strip: FSM, I_SATA, P_ac, T_piezo, T_skin, SoC, Kontakt, Rest.
-  - Chart grid 2×N; each plot in a card with title + caption; chart area
-    fixed height 280px (300px ultrawide).
-- Selftest results as compact badge list (pass/fail).
+- **Left (sticky, scrollable accordion)**: Programm, Intensität, Piezo/Treiber,
+  **Platine / Quelle**, Akustik, Operator, Sicherheit 19, Batterie, Selftest,
+  Export.
+- **Right**: Live KPI strip + chart grid.
 
 ### Bowl tab (`#tab-bowl`)
-- Same 2-column pattern.
-- **Left**: frequency chips (clear active state), preset chip row, accordion
-  (Drive open, Geometry open with primary Titan-Ø `bowlTiD`, Materials /
-  Electrode / Matching / A-B collapsed). Analyze / Defaults at bottom.
-- **Right**: KPI metrics strip → large centered schematic (`#bowlSvg`) →
-  chart grid (spectrum, sweeps, energy, field, profile, phase) each in a
-  titled card with caption.
+- Same 2-column pattern with collapse support.
+- **Left**: frequency chips, presets, Drive / Geometry / Materials /
+  **Platine / Quelle** / Matching / A-B.
+- **Right**: KPIs → schematic → charts.
 
 ### Mobile (<1200px)
-- Columns stack; sidebars become static full-width; charts collapse to
-  single column under ~800px. Toolbar wraps without horizontal page scroll.
+- Columns stack; reopen control becomes a horizontal chip.
 
 ## Charts / JS
 - Chart.js: `responsive: true`, `maintainAspectRatio: false`.
-- Containers have explicit height so plots do not collapse.
-- `resizeAllCharts()` on tab switch, window resize (debounced), and theme toggle.
+- `resizeAllCharts()` on tab switch, window resize (debounced), theme toggle,
+  **and settings collapse**.
 
 ## IDs
-- **No ID renames.** All existing element IDs used by `app.js` preserved
-  (including `bowlTiD` editable / not readonly, all canvas IDs, buttons).
+- **No ID renames.** Existing IDs preserved (`bowlTiD` editable, all canvases,
+  `vdrive`, `etaElec`, `bowlPcbV`, `bowlDrive`, …). New IDs only for collapse /
+  board controls.
 
 ## Files touched
-- `app/templates/index.html` — structure rewrite (IDs preserved)
-- `app/static/css/style.css` — full design system rewrite
-- `app/static/js/app.js` — resize hooks only
-- `Dockerfile` — `USIM_BUILD=ui-pro-2026-09-18`
-- `app/main.py` — `/api/build` note / default stamp
+- `app/templates/index.html`, `app/static/css/style.css`, `app/static/js/app.js`
+- `app/main.py`, `src/driver.py`, `src/simulation.py`, `src/acoustic_bowl.py`
+- `locales/de.json`, `locales/ru.json`, `config/calibration_bowl.yaml`
+- `tests/test_ui_collapse_power.py`
+- `Dockerfile` — `USIM_BUILD=ui-collapse-power-2026-09-18`
 - `DELIVERY_UI.md` — this file
 
 ## Verify
 ```bash
 pytest -q
-# TestClient GET / → 200; HTML contains bowlTiD without readonly
+# TestClient GET / → 200; HTML has btnSettingsCollapse; bowlTiD not readonly
 ```

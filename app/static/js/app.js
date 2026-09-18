@@ -2,6 +2,7 @@
 (function () {
   const LANG_KEY = "skinova_lang";
   const THEME_KEY = "skinova_theme";
+  const SETTINGS_COLLAPSE_KEY = "usim.settingsCollapsed";
   let i18n = window.__I18N__ || {};
   let lang = localStorage.getItem(LANG_KEY) || window.__LANG__ || "de";
   let programs = [];
@@ -90,7 +91,11 @@
       limit_domain: $("limitDomain").value,
       c0_nF: parseFloat($("c0nF").value),
       vdrive_peak_v: parseFloat($("vdrive").value),
+      pcb_drive_v: parseFloat(($("pcbDriveV") || $("vdrive")).value),
       eta_elec: parseFloat($("etaElec").value),
+      drive_level: parseFloat(($("driveLevel") || { value: 1 }).value),
+      p_elec_max_w: parseFloat(($("pElecMax") || { value: 8 }).value),
+      i_sense_window_ms: parseFloat(($("iSenseWindow") || { value: 2 }).value),
       stack_efficiency: parseFloat($("stackEff").value),
       gel_present: $("gelPresent").checked,
       force_n: parseFloat($("forceN").value),
@@ -118,6 +123,7 @@
     const keep = settingsPayload();
     i18n = await (await fetch("/api/i18n/" + code)).json();
     applyI18n();
+    updateCollapseLabels(isSettingsCollapsed());
     // restore a few fields that i18n might touch
     $("modelSelect").value = keep.model;
     $("gelPresent").checked = keep.gel_present;
@@ -355,6 +361,7 @@
       kt: parseFloat($("bowlKt").value),
       spectrum_span: parseFloat($("bowlSpan").value),
       pcb_drive_v: parseFloat(($("bowlPcbV") || { value: 40 }).value),
+      p_elec_max_w: parseFloat(($("bowlPElecMax") || { value: 8 }).value),
       r_wire_piezo_ohm: parseFloat(($("bowlRWire") || { value: 0.5 }).value),
       r_ti_return_ohm: parseFloat(($("bowlRTi") || { value: 0.2 }).value),
       stack_efficiency: parseFloat(($("bowlStackEff") || { value: 0.65 }).value),
@@ -405,6 +412,8 @@
     if ($("bowlKt") && p.kt != null) $("bowlKt").value = p.kt;
     if ($("bowlSpan") && p.spectrum_span != null) $("bowlSpan").value = p.spectrum_span;
     if ($("bowlPcbV") && p.pcb_drive_v != null) $("bowlPcbV").value = p.pcb_drive_v;
+    if ($("bowlPElecMax") && p.p_elec_max_w != null) $("bowlPElecMax").value = p.p_elec_max_w;
+    syncPowerPresetChips("bowlPowerPresets", p.drive_level ?? 1);
     if ($("bowlRWire") && p.r_wire_piezo_ohm != null) $("bowlRWire").value = p.r_wire_piezo_ohm;
     if ($("bowlRTi") && p.r_ti_return_ohm != null) $("bowlRTi").value = p.r_ti_return_ohm;
     if ($("bowlStackEff") && p.stack_efficiency != null) $("bowlStackEff").value = p.stack_efficiency;
@@ -695,6 +704,61 @@
     }, null, 2);
   }
 
+
+  function isSettingsCollapsed() {
+    return localStorage.getItem(SETTINGS_COLLAPSE_KEY) === "1";
+  }
+
+  function updateCollapseLabels(collapsed) {
+    const btn = $("btnSettingsCollapse");
+    if (!btn) return;
+    const icon = btn.querySelector(".collapse-icon");
+    const label = btn.querySelector(".collapse-label");
+    btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    if (icon) icon.textContent = collapsed ? "»" : "«";
+    if (label) {
+      label.setAttribute("data-i18n", collapsed ? "header.settings_show" : "header.settings_hide");
+      label.textContent = t(collapsed ? "header.settings_show" : "header.settings_hide");
+    }
+    btn.title = t(collapsed ? "header.settings_show" : "header.settings_hide");
+  }
+
+  function setSettingsCollapsed(collapsed) {
+    document.body.classList.toggle("settings-collapsed", !!collapsed);
+    localStorage.setItem(SETTINGS_COLLAPSE_KEY, collapsed ? "1" : "0");
+    ["btnSettingsReopenTherapy", "btnSettingsReopenBowl"].forEach((id) => {
+      const el = $(id);
+      if (el) el.hidden = !collapsed;
+    });
+    updateCollapseLabels(!!collapsed);
+    resizeAllCharts();
+    requestAnimationFrame(resizeAllCharts);
+  }
+
+  function syncPowerPresetChips(groupId, level) {
+    const g = $(groupId);
+    if (!g) return;
+    const lv = Number(level);
+    g.querySelectorAll(".preset-chip").forEach((b) => {
+      const v = parseFloat(b.dataset.power);
+      b.classList.toggle("active", Math.abs(v - lv) < 0.026);
+    });
+  }
+
+  function setTherapyDriveLevel(level) {
+    const lv = Math.max(0.05, Math.min(1, Number(level)));
+    if ($("driveLevel")) $("driveLevel").value = lv;
+    if ($("driveLevelVal")) $("driveLevelVal").textContent = lv.toFixed(2);
+    syncPowerPresetChips("therapyPowerPresets", lv);
+  }
+
+  function setBowlDriveLevel(level) {
+    const lv = Math.max(0.05, Math.min(1, Number(level)));
+    if ($("bowlDrive")) $("bowlDrive").value = lv;
+    if ($("bowlDriveVal")) $("bowlDriveVal").textContent = lv.toFixed(2);
+    syncPowerPresetChips("bowlPowerPresets", lv);
+  }
+
   // events
   document.querySelectorAll(".tab-btn").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
   document.querySelectorAll(".lang-btn").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
@@ -754,7 +818,49 @@
     if (p.gel_present != null) $("gelPresent").checked = p.gel_present;
     await applySettings();
   });
-  $("bowlDrive").addEventListener("input", (e) => { $("bowlDriveVal").textContent = Number(e.target.value).toFixed(2); });
+  $("bowlDrive").addEventListener("input", (e) => {
+    $("bowlDriveVal").textContent = Number(e.target.value).toFixed(2);
+    syncPowerPresetChips("bowlPowerPresets", e.target.value);
+  });
+
+  if ($("btnSettingsCollapse")) {
+    $("btnSettingsCollapse").addEventListener("click", () => {
+      setSettingsCollapsed(!isSettingsCollapsed());
+    });
+  }
+  document.querySelectorAll(".btn-collapse-local").forEach((b) => {
+    b.addEventListener("click", () => setSettingsCollapsed(true));
+  });
+  ["btnSettingsReopenTherapy", "btnSettingsReopenBowl"].forEach((id) => {
+    const el = $(id);
+    if (el) el.addEventListener("click", () => setSettingsCollapsed(false));
+  });
+  if ($("driveLevel")) {
+    $("driveLevel").addEventListener("input", (e) => {
+      setTherapyDriveLevel(e.target.value);
+    });
+  }
+  if ($("pcbDriveV") && $("vdrive")) {
+    $("pcbDriveV").addEventListener("change", () => {
+      $("vdrive").value = $("pcbDriveV").value;
+    });
+    $("vdrive").addEventListener("change", () => {
+      $("pcbDriveV").value = $("vdrive").value;
+    });
+  }
+  document.querySelectorAll("#therapyPowerPresets .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => {
+      setTherapyDriveLevel(b.dataset.power);
+      applySettings();
+    });
+  });
+  document.querySelectorAll("#bowlPowerPresets .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => {
+      setBowlDriveLevel(b.dataset.power);
+      analyzeBowl();
+    });
+  });
+
   $("bowlPiezoAuto").addEventListener("change", (e) => { $("bowlPiezoH").disabled = e.target.checked; });
   if ($("bowlTiD")) $("bowlTiD").addEventListener("input", () => syncRadiatingDiameter("ti"));
   if ($("bowlCupOuterD")) $("bowlCupOuterD").addEventListener("input", () => syncRadiatingDiameter("outer"));
@@ -781,7 +887,11 @@
     _resizeTimer = setTimeout(resizeAllCharts, 120);
   });
   initTherapyCharts();
+  setSettingsCollapsed(isSettingsCollapsed());
+  syncPowerPresetChips("therapyPowerPresets", ($("driveLevel") || { value: 1 }).value);
+  syncPowerPresetChips("bowlPowerPresets", ($("bowlDrive") || { value: 1 }).value);
   if (localStorage.getItem(LANG_KEY) && localStorage.getItem(LANG_KEY) !== window.__LANG__) setLang(localStorage.getItem(LANG_KEY));
   else applyI18n();
+  updateCollapseLabels(isSettingsCollapsed());
   loadPrograms().then(refresh);
 })();

@@ -118,6 +118,7 @@ class BowlParams:
     calibration: bool = True
     # Electrode / PCB (series R affect drive efficiency)
     pcb_drive_v: float = 40.0
+    p_elec_max_w: float = 8.0  # electrical power budget (Kalibrierung)
     r_wire_piezo_ohm: float = 0.5
     r_ti_return_ohm: float = 0.2
     droplet_demo: bool = False
@@ -245,6 +246,7 @@ def default_bowl_params(cfg: dict[str, Any] | None = None) -> BowlParams:
         spectrum_span=float(d.get("spectrum_span", 0.15)),
         calibration=bool(cfg.get("CALIBRATION_PRESET", True)),
         pcb_drive_v=float(d.get("pcb_drive_v", 40.0)),
+        p_elec_max_w=float(d.get("p_elec_max_w", 8.0)),
         r_wire_piezo_ohm=float(d.get("r_wire_piezo_ohm", 0.5)),
         r_ti_return_ohm=float(d.get("r_ti_return_ohm", 0.2)),
         droplet_demo=bool(d.get("droplet_demo", False)),
@@ -311,7 +313,7 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             "piezo_diameter_m",
             "glue_thickness_m",
         ],
-        "electrode_keys": ["pcb_drive_v", "r_wire_piezo_ohm", "r_ti_return_ohm"],
+        "electrode_keys": ["pcb_drive_v", "p_elec_max_w", "r_wire_piezo_ohm", "r_ti_return_ohm", "drive_level"],
         "stack_order": ["pzt", "glue", "ti_bottom", "load"],
     }
 
@@ -451,6 +453,7 @@ class AcousticBowl:
             "piezo_diameter_m": p.piezo_diameter_m,
             "glue_thickness_m": p.glue_thickness_m,
             "pcb_drive_v": p.pcb_drive_v,
+            "p_elec_max_w": p.p_elec_max_w,
             "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
             "r_ti_return_ohm": p.r_ti_return_ohm,
             "droplet_demo": p.droplet_demo,
@@ -612,8 +615,15 @@ class AcousticBowl:
         mats = self._materials()
         bw = self._bandwidth_factor()
 
-        p_drive = P_AC_MAX_W * max(0.0, min(1.0, p.drive_level))
+        level = max(0.0, min(1.0, p.drive_level))
+        # PCB peak voltage scales available drive (~V^2); 40 V = nominal
+        v_nom = 40.0
+        v_scale = (max(1.0, float(p.pcb_drive_v)) / v_nom) ** 2
+        p_drive = P_AC_MAX_W * level * v_scale
         p_drive = min(p_drive, I_MAX_W_CM2 * p.era_cm2)
+        p_budget = float(getattr(p, "p_elec_max_w", 8.0) or 8.0)
+        if p_budget > 0:
+            p_drive = min(p_drive, p_budget)
         stack_eff = float(getattr(p, "stack_efficiency", 0.65))
 
         if layers[-1].name == "air" or p.load == "air":
@@ -1042,6 +1052,7 @@ class AcousticBowl:
                 "spectrum_span": p.spectrum_span,
                 "stack_efficiency": p.stack_efficiency,
                 "pcb_drive_v": p.pcb_drive_v,
+                "p_elec_max_w": p.p_elec_max_w,
                 "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
                 "r_ti_return_ohm": p.r_ti_return_ohm,
                 "droplet_demo": p.droplet_demo,
@@ -1139,6 +1150,7 @@ def bowl_params_from_dict(
         "kt": float,
         "spectrum_span": float,
         "pcb_drive_v": float,
+        "p_elec_max_w": float,
         "r_wire_piezo_ohm": float,
         "r_ti_return_ohm": float,
         "droplet_demo": bool,
@@ -1205,6 +1217,7 @@ def bowl_params_from_dict(
     p.matching_thickness_m = float(np.clip(p.matching_thickness_m, 1e-6, 5e-4))
     p.spectrum_span = float(np.clip(p.spectrum_span, 0.05, 0.5))
     p.pcb_drive_v = float(np.clip(p.pcb_drive_v, 1.0, 100.0))
+    p.p_elec_max_w = float(np.clip(p.p_elec_max_w, 0.5, 50.0))
     p.r_wire_piezo_ohm = float(np.clip(p.r_wire_piezo_ohm, 0.0, 50.0))
     p.r_ti_return_ohm = float(np.clip(p.r_ti_return_ohm, 0.0, 50.0))
     p.stack_efficiency = float(np.clip(p.stack_efficiency, 0.1, 1.0))

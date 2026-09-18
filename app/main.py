@@ -44,9 +44,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.1.0-ui-pro",
-            "usim_build": _os.environ.get("USIM_BUILD", "ui-pro-2026-09-18"),
-            "note": "Professional desktop UI layout 2026-09-18",
+            "version": "1.1.0-ui-collapse-power",
+            "usim_build": _os.environ.get("USIM_BUILD", "ui-collapse-power-2026-09-18"),
+            "note": "Collapsible settings + board/source power 2026-09-18",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -86,7 +86,11 @@ class SettingsIn(BaseModel):
     bat_capacity_wh: float | None = None
     stack_efficiency: float | None = None
     vdrive_peak_v: float | None = None
+    pcb_drive_v: float | None = None
     eta_elec: float | None = None
+    drive_level: float | None = None
+    p_elec_max_w: float | None = None
+    i_sense_window_ms: float | None = None
     c0_nF: float | None = None
     k_eff2: float | None = None
     q_m_air: float | None = None
@@ -182,9 +186,26 @@ async def api_settings(body: SettingsIn) -> dict[str, Any]:
     if body.vdrive_peak_v is not None:
         cfg.vdrive_peak_v = body.vdrive_peak_v
         sim.driver.params.vdrive_peak_v = body.vdrive_peak_v
+    if body.pcb_drive_v is not None:
+        cfg.pcb_drive_v = body.pcb_drive_v
+        sim.driver.params.pcb_drive_v = body.pcb_drive_v
+        # Keep peak drive aligned with board source unless explicitly overridden later
+        if body.vdrive_peak_v is None:
+            cfg.vdrive_peak_v = body.pcb_drive_v
+            sim.driver.params.vdrive_peak_v = body.pcb_drive_v
     if body.eta_elec is not None:
         cfg.eta_elec = body.eta_elec
         sim.driver.params.eta_elec = body.eta_elec
+    if body.drive_level is not None:
+        lvl = max(0.0, min(1.0, float(body.drive_level)))
+        cfg.drive_level = lvl
+        sim.driver.params.drive_level = lvl
+    if body.p_elec_max_w is not None:
+        cfg.p_elec_max_w = float(body.p_elec_max_w)
+        sim.driver.params.p_elec_max_w = float(body.p_elec_max_w)
+    if body.i_sense_window_ms is not None:
+        cfg.i_sense_window_ms = float(body.i_sense_window_ms)
+        sim.driver.params.i_sense_window_ms = float(body.i_sense_window_ms)
     if body.c0_nF is not None:
         cfg.c0_nF = body.c0_nF
         rebuild = True
@@ -385,6 +406,7 @@ class BowlParamsIn(BaseModel):
     kt: float | None = None
     spectrum_span: float | None = None
     pcb_drive_v: float | None = None
+    p_elec_max_w: float | None = None
     r_wire_piezo_ohm: float | None = None
     r_ti_return_ohm: float | None = None
     droplet_demo: bool | None = None

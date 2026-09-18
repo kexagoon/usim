@@ -19,7 +19,10 @@
     "charge": "Laden",
     "theme_light": "Hell",
     "theme_dark": "Dunkel",
-    "theme": "Theme"
+    "theme": "Theme",
+    "settings_hide": "Einstellungen ausblenden",
+    "settings_show": "Einstellungen einblenden",
+    "settings_show_short": "Einstellungen"
   },
   "panels": {
     "program": "Programm",
@@ -42,7 +45,9 @@
     "station": "Station",
     "battery": "Batterie",
     "contraindications": "Kontraindikationen (Hinweis)",
-    "bowl": "Akustik-Schale (Titan-Schale / Piezo / Kleber)"
+    "bowl": "Akustik-Schale (Titan-Schale / Piezo / Kleber)",
+    "settings": "Einstellungen",
+    "board_source": "Platine / Quelle"
   },
   "fields": {
     "program_select": "Programm wählen",
@@ -98,7 +103,12 @@
     "c1": "C1",
     "l1": "L1",
     "alpha_n": "α-Exponent n (Kalibrierung)",
-    "path": "Operator-Pfad"
+    "path": "Operator-Pfad",
+    "pcb_drive_v": "PCB-Ansteuerung (V)",
+    "drive_level": "Leistungsstufe (Drive)",
+    "power_presets": "Leistungs-Presets",
+    "p_elec_max_w": "P_elec max (W) — Kalibrierung",
+    "i_sense_window_ms": "Current-Sense-Fenster (ms) — Kalibrierung"
   },
   "plots": {
     "i_x": "I(x) Intensität",
@@ -309,7 +319,11 @@
     "schematic_axis": "Akustische Achse (1D)",
     "schematic_note": "Seitenwände nur elektrisch — nicht in T-Matrix.",
     "help_era": "ERA aus Durchmesser π(d/2)² — editierbar. ERA ändern setzt äquivalenten Durchmesser d_eq. Hersteller≈3 cm² nur Default.",
-    "hint_piezo_clamp": "Piezo-Ø auf {limit} mm begrenzt (≤ min(Innen-Ø, Strahl-Ø))."
+    "hint_piezo_clamp": "Piezo-Ø auf {limit} mm begrenzt (≤ min(Innen-Ø, Strahl-Ø)).",
+    "sec_board_source": "Platine / Quelle",
+    "hint_board_source": "Elektronik speist eine Leitung zum Piezo; Rückleitung über Titan. Kalibrierung.",
+    "p_elec_max": "P_elec max (W) — Kalibrierung",
+    "help_p_elec_max": "Maximales elektrisches Leistungsbudget der Platine (Kalibrierung)."
   },
   "hints": {
     "program_panel": "Programmparameter der Therapie-Simulation. Unbekannte Werkswerte sind als Kalibrierung markiert.",
@@ -345,7 +359,12 @@
     "t_off": "Abschaltschwelle Überhitze (°C). Kalibrierung.",
     "motion_still": "Zeit ohne Bewegung bis Motion-Fault.",
     "motion_eps": "IMU-Schwelle für „Bewegung erkannt“.",
-    "bat": "Batteriekapazität (Wh). Kalibrier-Default, kein Datenblatt."
+    "bat": "Batteriekapazität (Wh). Kalibrier-Default, kein Datenblatt.",
+    "board_source": "Elektronik, die eine Leitung zum Piezo speist; Rückleitung über Titan. Alle Werte sind Kalibrierung, keine Werkswerte.",
+    "pcb_drive_v": "Spitzenspannung der Platine / Quelle (Kalibrierung).",
+    "drive_level": "Anteil der maximalen Board-Leistung (0–100%). Beeinflusst I_SATA und P_bat.",
+    "p_elec_max_w": "Maximales elektrisches Leistungsbudget der Quelle (Kalibrierung). Begrenzt P_bat.",
+    "i_sense_window_ms": "Zeitfenster der Strommessung am Treiber (Kalibrierung, Anzeige)."
   },
   "captions": {
     "i_x": "I(x): Intensität vs. Tiefe. Achse x in mm, I in W/cm². Abfall durch Absorption (α).",

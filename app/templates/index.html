@@ -40,6 +40,12 @@
         <button id="btnUndock" class="btn-tool" data-i18n="header.undock">{{ i18n.header.undock }}</button>
         <button id="btnWrite" class="btn-tool" data-i18n="header.write">{{ i18n.header.write }}</button>
       </div>
+      <button id="btnSettingsCollapse" class="btn-tool btn-collapse" type="button"
+              aria-controls="tab-therapy tab-bowl" aria-expanded="true"
+              title="Einstellungen ausblenden">
+        <span class="collapse-icon" aria-hidden="true">«</span>
+        <span class="collapse-label" data-i18n="header.settings_hide">Einstellungen ausblenden</span>
+      </button>
       <button id="btnTheme" class="btn-tool" data-i18n="header.theme">{{ i18n.header.theme }}</button>
     </div>
   </header>
@@ -48,7 +54,19 @@
 
   <!-- ===================== THERAPY TAB ===================== -->
   <main class="therapy-layout" id="tab-therapy" data-tab-panel="therapy">
-    <aside class="therapy-sidebar card">
+    <button type="button" id="btnSettingsReopenTherapy" class="settings-reopen" hidden
+            aria-label="Einstellungen einblenden" data-i18n-title="header.settings_show" title="">
+      <span aria-hidden="true">»</span>
+      <span class="reopen-text" data-i18n="header.settings_show_short">Einstellungen</span>
+    </button>
+    <aside class="therapy-sidebar card settings-col" id="therapySettingsCol">
+      <div class="sidebar-head">
+        <h2 class="card-title" data-i18n="panels.settings">Einstellungen</h2>
+        <button type="button" class="btn-icon btn-collapse-local" data-collapse-target="therapy"
+                aria-label="Einstellungen ausblenden" data-i18n-title="header.settings_hide" title="">
+          <span aria-hidden="true">«</span>
+        </button>
+      </div>
       <div class="accordion">
 
         <details open class="collapsible">
@@ -140,16 +158,6 @@
               <input type="number" id="qMGel" min="5" max="80" step="1" value="25" />
               <small class="help" data-i18n="hints.q_m_gel"></small>
             </label>
-            <label><span data-i18n="fields.vdrive">{{ i18n.fields.vdrive }}</span>
-              <span class="info" data-i18n-title="hints.vdrive" title="">?</span>
-              <input type="number" id="vdrive" min="5" max="80" step="1" value="40" />
-              <small class="help" data-i18n="hints.vdrive"></small>
-            </label>
-            <label><span data-i18n="fields.eta_elec">{{ i18n.fields.eta_elec }}</span>
-              <span class="info" data-i18n-title="hints.eta_elec" title="">?</span>
-              <input type="number" id="etaElec" min="0.3" max="0.98" step="0.01" value="0.7" />
-              <small class="help" data-i18n="hints.eta_elec"></small>
-            </label>
             <label><span data-i18n="fields.stack_eff">{{ i18n.fields.stack_eff }}</span>
               <span class="info" data-i18n-title="hints.stack_eff" title="">?</span>
               <input type="number" id="stackEff" min="0.3" max="0.95" step="0.01" value="0.65" />
@@ -163,6 +171,55 @@
               <div><span data-i18n="fields.vswr">VSWR</span>: <b id="vVswr">—</b></div>
             </div>
             <p class="caption" data-i18n="captions.bvd_live"></p>
+          </div>
+        </details>
+
+
+        <details open class="collapsible" id="secBoardSource">
+          <summary data-i18n="panels.board_source">{{ i18n.panels.board_source }}</summary>
+          <div class="collapsible-body">
+            <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
+            <p class="hint" data-i18n="hints.board_source"></p>
+            <label><span data-i18n="fields.pcb_drive_v">{{ i18n.fields.pcb_drive_v }}</span>
+              <span class="info" data-i18n-title="hints.pcb_drive_v" title="">?</span>
+              <input type="number" id="pcbDriveV" min="5" max="80" step="1" value="40" />
+              <small class="help" data-i18n="hints.pcb_drive_v"></small>
+            </label>
+            <label><span data-i18n="fields.vdrive">{{ i18n.fields.vdrive }}</span>
+              <span class="info" data-i18n-title="hints.vdrive" title="">?</span>
+              <input type="number" id="vdrive" min="5" max="80" step="1" value="40" />
+              <small class="help" data-i18n="hints.vdrive"></small>
+            </label>
+            <div class="power-presets" role="group" aria-label="Power presets">
+              <span class="preset-label" data-i18n="fields.power_presets">Leistungsstufe</span>
+              <div class="preset-chips" id="therapyPowerPresets">
+                <button type="button" class="preset-chip" data-power="0.25">25%</button>
+                <button type="button" class="preset-chip" data-power="0.50">50%</button>
+                <button type="button" class="preset-chip" data-power="0.75">75%</button>
+                <button type="button" class="preset-chip active" data-power="1.00">100%</button>
+              </div>
+            </div>
+            <label><span data-i18n="fields.drive_level">{{ i18n.fields.drive_level }}</span>
+              <span class="info" data-i18n-title="hints.drive_level" title="">?</span>
+              <input type="range" id="driveLevel" min="0.05" max="1" step="0.05" value="1" />
+              <span id="driveLevelVal">1.00</span>
+              <small class="help" data-i18n="hints.drive_level"></small>
+            </label>
+            <label><span data-i18n="fields.eta_elec">{{ i18n.fields.eta_elec }}</span>
+              <span class="info" data-i18n-title="hints.eta_elec" title="">?</span>
+              <input type="number" id="etaElec" min="0.3" max="0.98" step="0.01" value="0.7" />
+              <small class="help" data-i18n="hints.eta_elec"></small>
+            </label>
+            <label><span data-i18n="fields.p_elec_max_w">{{ i18n.fields.p_elec_max_w }}</span>
+              <span class="info" data-i18n-title="hints.p_elec_max_w" title="">?</span>
+              <input type="number" id="pElecMax" min="0.5" max="50" step="0.1" value="8" />
+              <small class="help" data-i18n="hints.p_elec_max_w"></small>
+            </label>
+            <label><span data-i18n="fields.i_sense_window_ms">{{ i18n.fields.i_sense_window_ms }}</span>
+              <span class="info" data-i18n-title="hints.i_sense_window_ms" title="">?</span>
+              <input type="number" id="iSenseWindow" min="0.1" max="50" step="0.1" value="2" />
+              <small class="help" data-i18n="hints.i_sense_window_ms"></small>
+            </label>
           </div>
         </details>
 
@@ -313,7 +370,7 @@
       </div>
     </aside>
 
-    <div class="therapy-main">
+    <div class="therapy-main results-col">
       <div class="kpi-strip" aria-live="polite">
         <div class="kpi-item"><span class="kpi-label" data-i18n="fields.state">FSM</span><b id="vState">—</b></div>
         <div class="kpi-item"><span class="kpi-label" data-i18n="fields.i_sata_wcm2">I_SATA</span><b id="vIsata">—</b></div>
@@ -372,8 +429,19 @@
     </div>
 
     <div class="bowl-workspace">
-      <aside class="bowl-controls card">
-        <h2 class="card-title" data-i18n="bowl.controls">Controls</h2>
+      <button type="button" id="btnSettingsReopenBowl" class="settings-reopen" hidden
+              aria-label="Einstellungen einblenden" data-i18n-title="header.settings_show" title="">
+        <span aria-hidden="true">»</span>
+        <span class="reopen-text" data-i18n="header.settings_show_short">Einstellungen</span>
+      </button>
+      <aside class="bowl-controls card settings-col" id="bowlSettingsCol">
+        <div class="sidebar-head">
+          <h2 class="card-title" data-i18n="bowl.controls">Controls</h2>
+          <button type="button" class="btn-icon btn-collapse-local" data-collapse-target="bowl"
+                  aria-label="Einstellungen ausblenden" data-i18n-title="header.settings_hide" title="">
+            <span aria-hidden="true">«</span>
+          </button>
+        </div>
         <div class="freq-chips" id="bowlFreqChips" role="group">
           <button type="button" class="chip" data-f0="1000000">1</button>
           <button type="button" class="chip" data-f0="3000000">3</button>
@@ -530,14 +598,29 @@
             </div>
           </details>
 
-          <details class="collapsible">
-            <summary data-i18n="bowl.sec_electrode">Elektroden / PCB</summary>
+          <details open class="collapsible" id="secBowlBoardSource">
+            <summary data-i18n="bowl.sec_board_source">Platine / Quelle</summary>
             <div class="collapsible-body">
-              <p class="hint" data-i18n="bowl.hint_electrode"></p>
+              <span class="badge calib" data-i18n="app.calibration_badge">Kalibrierung</span>
+              <p class="hint" data-i18n="bowl.hint_board_source"></p>
               <label><span data-i18n="bowl.pcb_v">PCB drive V</span>
                 <span class="info" data-i18n-title="bowl.help_pcb_v" title="">?</span>
                 <input type="number" id="bowlPcbV" min="5" max="80" step="1" value="40" />
                 <small class="help" data-i18n="bowl.help_pcb_v"></small>
+              </label>
+              <div class="power-presets" role="group">
+                <span class="preset-label" data-i18n="fields.power_presets">Leistungsstufe</span>
+                <div class="preset-chips" id="bowlPowerPresets">
+                  <button type="button" class="preset-chip" data-power="0.25">25%</button>
+                  <button type="button" class="preset-chip" data-power="0.50">50%</button>
+                  <button type="button" class="preset-chip" data-power="0.75">75%</button>
+                  <button type="button" class="preset-chip active" data-power="1.00">100%</button>
+                </div>
+              </div>
+              <label><span data-i18n="bowl.p_elec_max">P_elec max (W)</span>
+                <span class="info" data-i18n-title="bowl.help_p_elec_max" title="">?</span>
+                <input type="number" id="bowlPElecMax" min="0.5" max="50" step="0.1" value="8" />
+                <small class="help" data-i18n="bowl.help_p_elec_max"></small>
               </label>
               <label><span data-i18n="bowl.r_wire">R_wire piezo (Ω)</span>
                 <span class="info" data-i18n-title="bowl.help_r_wire" title="">?</span>
@@ -619,7 +702,7 @@
         </div>
       </aside>
 
-      <div class="bowl-results">
+      <div class="bowl-results results-col">
         <div class="kpi-strip" id="bowlMetrics" aria-live="polite">
           <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.t_at_f0">T</span><b id="bowlT">—</b></div>
           <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.r_at_f0">R</span><b id="bowlR">—</b></div>

@@ -82,7 +82,11 @@ class SimulationConfig:
     t_off_c: float = 43.0
     stack_efficiency: float = 0.65
     vdrive_peak_v: float = 40.0
+    pcb_drive_v: float = 40.0
     eta_elec: float = 0.7
+    drive_level: float = 1.0
+    p_elec_max_w: float = 8.0
+    i_sense_window_ms: float = 2.0
     c0_nF: float = 1.5
     k_eff2: float | None = None
     q_m_air: float | None = None
@@ -145,12 +149,16 @@ class Simulation:
         self.driver = Driver(
             DriverParams(
                 vdrive_peak_v=self.cfg.vdrive_peak_v,
+                pcb_drive_v=self.cfg.pcb_drive_v,
                 eta_elec=self.cfg.eta_elec,
                 stack_efficiency=self.cfg.stack_efficiency,
                 i_max_w_cm2=float(self.devices["sonotrode"]["i_max_w_cm2"]),
                 era_cm2=era_cm2,
                 limit_domain=self.cfg.limit_domain,
                 p_ac_max_w=float(self.devices["sonotrode"]["p_ac_max_w"]),
+                drive_level=self.cfg.drive_level,
+                p_elec_max_w=self.cfg.p_elec_max_w,
+                i_sense_window_ms=self.cfg.i_sense_window_ms,
             )
         )
         h_pzt = suggested_piezo_thickness_m(self.f0)
@@ -463,7 +471,11 @@ class Simulation:
             else float(self.tissue.get("alpha_power_n", 1.2)),
             "stack_efficiency": self.cfg.stack_efficiency,
             "vdrive_peak_v": self.cfg.vdrive_peak_v,
+            "pcb_drive_v": self.cfg.pcb_drive_v,
             "eta_elec": self.cfg.eta_elec,
+            "drive_level": self.cfg.drive_level,
+            "p_elec_max_w": self.cfg.p_elec_max_w,
+            "i_sense_window_ms": self.cfg.i_sense_window_ms,
         }
 
 
