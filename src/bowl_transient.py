@@ -408,5 +408,19 @@ def run_bowl_transient(
             "derate_events": derate_events,
             "resonance_shift_end_hz": float(res_shift_end),
             "glue_loss_factor_end": float(glue_f_list[-1]) if glue_f_list else 1.0,
+            "energy_start": {
+                "p_radiated_w": float(pac_list[0]) if pac_list else 0.0,
+                "p_glue_loss_w": float(p_glue_list[0]) if p_glue_list else 0.0,
+                "p_piezo_heat_w": float(p_pzt_list[0]) if p_pzt_list else 0.0,
+                "p_ti_loss_w": float(p_ti_list[0]) if p_ti_list else 0.0,
+                "efficiency": float(eta_list[0]) if eta_list else 0.0,
+            },
+            "energy_end": {
+                "p_radiated_w": float(pac_list[-1]) if pac_list else 0.0,
+                "p_glue_loss_w": float(p_glue_list[-1]) if p_glue_list else 0.0,
+                "p_piezo_heat_w": float(p_pzt_list[-1]) if p_pzt_list else 0.0,
+                "p_ti_loss_w": float(p_ti_list[-1]) if p_ti_list else 0.0,
+                "efficiency": float(eta_list[-1]) if eta_list else 0.0,
+            },
         },
     }

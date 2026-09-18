@@ -361,7 +361,12 @@
     "legend_drive": "Drive",
     "legend_derate": "Derate",
     "legend_glue_factor": "glue_factor",
-    "time_s": "t (с)"
+    "time_s": "t (с)",
+    "energy_phase_end": "Конец (после времени)",
+    "energy_phase_start": "Старт (t = 0)",
+    "caption_energy_sync": "Диаграмма следует за Analysieren: старт = холодно; конец = после выбранной длительности (клей/η/derate). Доли в Вт и %. Воздух: излучение ≈ 0.",
+    "energy_total": "Сумма",
+    "energy_share": "Доля"
   },
   "hints": {
     "program_panel": "Параметры программы терапии. Неизвестные заводские значения помечены как калибровка.",

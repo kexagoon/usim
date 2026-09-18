@@ -934,3 +934,19 @@ body.settings-collapsed .btn-collapse {
 .kpi-transient { margin-top: 8px; border-top: 1px dashed var(--border, #334); padding-top: 8px; }
 .badge.calib { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #5c4a1e; color: #ffd866; margin-bottom: 8px; }
 details.nested { margin-top: 8px; border-left: 2px solid var(--border, #445); padding-left: 8px; }
+
+
+.energy-toolbar { margin-bottom: 8px; }
+.energy-detail {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.energy-detail .ed-row { display: contents; }
+.energy-detail .ed-name { color: var(--text); font-weight: 600; }
+.energy-detail .ed-w, .energy-detail .ed-pct { font-variant-numeric: tabular-nums; text-align: right; }
+.energy-detail .ed-total { grid-column: 1 / -1; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); color: var(--text); font-weight: 700; }
+.caption.muted { opacity: 0.85; font-size: 0.75rem; }

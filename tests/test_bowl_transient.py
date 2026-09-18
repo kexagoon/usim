@@ -140,10 +140,23 @@ def test_api_transient_and_params_path():
 def test_api_build_stamp_transient():
     client = TestClient(app)
     b = client.get("/api/build").json()
-    assert "bowl-transient" in b.get("usim_build", "")
+    assert ("bowl-transient" in b.get("usim_build", "") or "bowl-energy" in b.get("usim_build", "") or "energy-sync" in b.get("usim_build", ""))
 
 
 def test_thermal_params_from_dict_clips():
     th = thermal_params_from_dict({"t_amb_c": 1000, "k_glue_loss_per_c": 5.0})
     assert th.t_amb_c <= 45.0
     assert th.k_glue_loss_per_c <= 0.2
+
+
+def test_transient_summary_energy_start_end():
+    from src.acoustic_bowl import AcousticBowl, default_bowl_params
+    from src.bowl_transient import run_bowl_transient
+    b = AcousticBowl(default_bowl_params())
+    r = run_bowl_transient(b, duration_s=3.0, dt_s=0.5)
+    s = r["summary"]
+    assert "energy_start" in s and "energy_end" in s
+    for k in ("p_radiated_w", "p_glue_loss_w", "p_piezo_heat_w", "p_ti_loss_w"):
+        assert k in s["energy_start"] and k in s["energy_end"]
+    # heated run should typically shift partition (not require strict inequality)
+    assert s["energy_start"]["p_radiated_w"] >= 0

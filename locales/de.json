@@ -361,7 +361,12 @@
     "legend_drive": "Drive",
     "legend_derate": "Derate",
     "legend_glue_factor": "glue_factor",
-    "time_s": "t (s)"
+    "time_s": "t (s)",
+    "energy_phase_end": "Ende (nach Zeitverlauf)",
+    "energy_phase_start": "Start (t = 0)",
+    "caption_energy_sync": "Diagramm folgt Analysieren: Start = kalt; Ende = nach gewählter Dauer (Kleber/η/Derate). Anteile in W und %. Luft: Strahlung ≈ 0.",
+    "energy_total": "Summe",
+    "energy_share": "Anteil"
   },
   "hints": {
     "program_panel": "Programmparameter der Therapie-Simulation. Unbekannte Werkswerte sind als Kalibrierung markiert.",

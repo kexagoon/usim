@@ -807,8 +807,16 @@
           </section>
           <section class="chart-card">
             <h2 class="card-title" data-i18n="bowl.energy">Energy</h2>
+            <div class="energy-toolbar">
+              <div class="preset-chips" id="bowlEnergyPhase" role="group">
+                <button type="button" class="preset-chip active" data-phase="end" data-i18n="bowl.energy_phase_end">Ende (nach Zeit)</button>
+                <button type="button" class="preset-chip" data-phase="start" data-i18n="bowl.energy_phase_start">Start (t=0)</button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlEnergy"></canvas></div>
+            <div class="energy-detail" id="bowlEnergyDetail" aria-live="polite"></div>
             <p class="caption" data-i18n="bowl.caption_energy"></p>
+            <p class="caption muted" data-i18n="bowl.caption_energy_sync"></p>
           </section>
           <section class="chart-card wide">
             <h2 class="card-title" data-i18n="bowl.field">Near-field</h2>

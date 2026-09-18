@@ -51,9 +51,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.2.0-bowl-transient",
-            "usim_build": _os.environ.get("USIM_BUILD", "bowl-transient-2026-09-18"),
-            "note": "Akustik-Schale time-dependent thermal-acoustic transient 2026-09-18",
+            "version": "1.2.1-bowl-energy-sync",
+            "usim_build": _os.environ.get("USIM_BUILD", "bowl-energy-sync-2026-09-18"),
+            "note": "Energieaufteilung synced to transient start/end 2026-09-18",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
