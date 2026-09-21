@@ -767,9 +767,9 @@ class AcousticBowl:
 
     def sweep_titanium(
         self,
-        h_min_m: float = 1e-4,
-        h_max_m: float = 1e-3,
-        n: int = 40,
+        h_min_m: float = 5e-5,
+        h_max_m: float = 3e-3,
+        n: int = 100,
     ) -> dict[str, Any]:
         original = self.params.ti_thickness_m
         thicknesses = np.linspace(h_min_m, h_max_m, n)
@@ -1227,7 +1227,7 @@ def bowl_params_from_dict(
 
     p.piezo_diameter_m = min(p.piezo_diameter_m, p.cup_inner_diameter_m, p.ti_diameter_m)
     p.glue_thickness_m = float(np.clip(p.glue_thickness_m, 1e-7, 1e-4))
-    p.ti_thickness_m = float(np.clip(p.ti_thickness_m, 5e-5, 2e-3))
+    p.ti_thickness_m = float(np.clip(p.ti_thickness_m, 5e-5, 5e-3))
     p.sync_cup_radiator()
     p.drive_level = float(np.clip(p.drive_level, 0.0, 1.0))
     p.matching_thickness_m = float(np.clip(p.matching_thickness_m, 1e-6, 5e-4))

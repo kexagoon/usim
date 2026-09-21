@@ -216,7 +216,7 @@
     "p_piezo": "Wärme Piezo",
     "p_ti": "Verlust Ti",
     "efficiency": "Wirkungsgrad",
-    "help_ti": "Dicke des Ti-Bodens (strahlende Wand). 0,1–1,0 mm typ. — Kalibrierung, nicht veröffentlicht.",
+    "help_ti": "Dicke des Ti-Bodens (strahlende Wand). Sweep typ. 0,05–3,0 mm — Kalibrierung, nicht veröffentlicht.",
     "help_glue": "Typisch 1–50 µm; dicke Schicht → Fehlanpassung/Verlust.",
     "help_piezo": "Vorschlag λ/2 in Keramik bei f0; überschreibbar.",
     "help_dia": "Freier Kalibrierparameter (Strahlfläche). Hersteller-ERA≈3 cm² ist nur der Default (d_eq≈19,5 mm), keine Sperre. Ändern von Titan-Ø aktualisiert ERA und Cup-Außen-Ø.",
@@ -366,7 +366,23 @@
     "energy_phase_start": "Start (t = 0)",
     "caption_energy_sync": "Diagramm folgt Analysieren: Start = kalt; Ende = nach gewählter Dauer (Kleber/η/Derate). Anteile in W und %. Luft: Strahlung ≈ 0.",
     "energy_total": "Summe",
-    "energy_share": "Anteil"
+    "energy_share": "Anteil",
+    "expand": "Vollbild",
+    "info": "Info",
+    "modal_close": "Schließen",
+    "info_spectrum": "Was: Intensitäts-Transmission |T|², Reflexion |R|² und normierte Eingangsimpedanz |Z_in| über Frequenz um f0.\n\nWie: 1D-Transfermatrix-Stack (Piezo → Kleber → Ti-Boden → Last). Spektrum mit konfigurierbarem Span um f0.\n\nEingaben: f0, Spektrum-Span, Schichtgeometrie, Lastmedium, Drive.\n\nResonanz: Peak von |T| bzw. |Z_in|; Δf = f_res − f0 in den KPIs.\n\nCALIBRATION — Materialparameter und Dämpfungen sind Kalibrierwerte, keine Werksmessung.",
+    "info_glue": "Was: Abgestrahlte Leistung P_ac und Wirkungsgrad η vs. Kleberdicke.\n\nWie: Parameter-Sweep der Kleberschicht im Transfermatrix-Stack bei festem f0; Energiepartition je Punkt.\n\nEingaben: Klebermaterial/-dicke-Bereich (typ. 1–50 µm), Stack, Last, Drive.\n\nInterpretation: Dickere Schicht → Fehlanpassung und akustische Verluste → weniger P_ac.\n\nCALIBRATION — Kleberbereich und Verlustmodell kalibrierbar.",
+    "info_ti": "Was: Transmission T(f0) und Resonanzverschiebung vs. Titan-Bodendicke.\n\nWie: Sweep h_Ti ≈ 0,05–3,0 mm (n≈100). Pro Punkt: Transfermatrix, T/R bei f0, Resonanz aus Spektrum, Energiepartition.\n\nEingaben: Ti-Dicke-Bereich, f0, restlicher Stack, Last, Drive.\n\nDeutung: Bodendicke verschiebt akustische Resonanz (λ/2-artige Bedingungen im Metall) und ändert Durchlass bei f0.\n\nCALIBRATION — weiter Bereich bewusst für Kalibrierung / Sensitivität, nicht als Produkt-Spec.",
+    "info_energy": "Was: Aufteilung der elektrischen Antriebsleistung in P_rad, P_glue, P_piezo, P_Ti.\n\nWie: Energiepartition aus Stack-T/R und Verlustmodellen; Start = kalt (nach Analysieren), Ende = nach transientem Zeitverlauf.\n\nEingaben: Drive, PCB-Spannung, P_elec_max, Stack, Last, Dauer/Transient.\n\nCALIBRATION — Wirkungsgrade und Verlustanteile kalibrierbar.",
+    "info_field": "Was: Nahfeld-Intensität I(z) auf Achse (Kolbenstrahler-Näherung).\n\nWie: Edukatives Nahfeldmodell mit z_n = a²/λ; a aus Strahler-Radius, λ aus Lastgeschwindigkeit und f0.\n\nEingaben: Ti-/ERA-Durchmesser, f0, Lastmedium, abgestrahlte Intensität.\n\nCALIBRATION — vereinfachtes Feldmodell, keine FEM.",
+    "info_dia": "Was: P_ac und I_SATA vs. Piezo-Durchmesser (begrenzt durch Cup-Innen-Ø).\n\nWie: Sweep des Piezo-Ø bei sonst festem Stack; Fläche skaliert Antrieb und Abstrahlung.\n\nEingaben: Piezo-Ø-Bereich, Cup-Geometrie, Drive, Last.\n\nCALIBRATION — geometrische Grenzen und ERA-Kopplung kalibrierbar.",
+    "info_f0": "Was: Vergleich P_ac und η bei f0 ∈ {1, 3, 10, 19} MHz.\n\nWie: Pro Frequenz Auto-λ/2-Piezodicke und Spektrum/Energie; x½ und λ skalieren mit f.\n\nEingaben: erlaubte f0-Anker, Stack-Materialien, Last, Drive.\n\nCALIBRATION — Frequenzanker und Materialdispersion vereinfacht.",
+    "info_profile": "Was: |p|(z) entlang der akustischen Achse durch piezo | glue | Ti-Boden | Gel/Gewebe.\n\nWie: 1D-Druckprofil aus Transfermatrix / Wellenlösung je Schicht.\n\nEingaben: Schichtfolgen und Dicken, f0, Last.\n\nCALIBRATION — 1D-Annahme, Seitenwände nur elektrisch.",
+    "info_phase": "Was: Phase von Z_in und Transmission vs. Frequenz.\n\nWie: Arg(Z_in) und Arg(T) aus demselben Spektrum wie |T|/|Z|.\n\nEingaben: identisch zum Spektrum-Chart.\n\nNutzen: Resonanz-/Antiresonanz-Lage und Blindanteil der Last.\n\nCALIBRATION.",
+    "info_temps": "Was: T_piezo, T_glue, T_Ti über der Zeit.\n\nWie: Transienter lumped thermal nodes: Verluste heizen Knoten, Konvektion kühlt; Rückkopplung auf Akustik (Kleberverlust, η, Derate).\n\nEingaben: Dauer, thermische Kapazitäten/Widerstände, Verlustleistungen, T_warn/T_off.\n\nCALIBRATION — thermische RC-Parameter und Grenztemperaturen.",
+    "info_pacEta": "Was: Abgestrahlte Leistung P_ac und Wirkungsgrad η vs. Zeit.\n\nWie: Aus Transient: mit Erwärmung steigen oft Kleberverluste, η sinkt, Derate greift.\n\nEingaben: wie Temperatur-Chart; Drive-Budget.\n\nCALIBRATION.",
+    "info_derate": "Was: Drive-Level und Derate-Faktor vs. Zeit.\n\nWie: Ab T_warn sanfte Absenkung Richtung T_off (optional cos-smooth); skaliert die effektive Ansteuerung.\n\nEingaben: T_warn, T_off, Derate-Modus, Transient.\n\nCALIBRATION — Schutzkurve, keine klinische Grenze.",
+    "info_losses": "Was: Wärmeleistungen in Piezo/Kleber/Ti und glue_loss_factor vs. Zeit.\n\nWie: Verlustpartition + temperaturabhängige α-Skalierung des Klebers (glue_loss_factor).\n\nEingaben: Transient, Verlustmodell, Stack.\n\nCALIBRATION."
   },
   "hints": {
     "program_panel": "Programmparameter der Therapie-Simulation. Unbekannte Werkswerte sind als Kalibrierung markiert.",
@@ -417,5 +433,13 @@
     "burst": "Burst-Envelope (1=ON). PRF und Duty bestimmen das Muster.",
     "fsm": "FSM-Zustandscode über die Zeit (0=IDLE_DOCKED …).",
     "bvd_live": "Live BVD: R1 aus Last; C1/L1 aus k_eff² und f0 abgeleitet."
+  },
+  "therapy": {
+    "info_ix": "Was: Intensität I vs. Gewebetiefe x (Therapie-Pfad).\n\nWie: Propagation/Bioheat-Pfad der Sonotrode; Programm-I_SATA und Kontakt.\n\nCALIBRATION — Therapieplot aus Verhaltensmodell.",
+    "info_tx": "Was: Temperatur T(x) entlang der Tiefe.\n\nWie: Bioheat / Absorption aus I(x); Operator-Pfad und Duty.\n\nCALIBRATION.",
+    "info_dose": "Was: akkumulierte Dosis über der Zeit/Tiefe.\n\nWie: Integration der Intensität unter Programm- und Kontaktbedingungen.\n\nCALIBRATION.",
+    "info_soc": "Was: Batterie-State-of-Charge.\n\nWie: Entladung aus Treiberleistung und Stationslogik.\n\nCALIBRATION.",
+    "info_burst": "Was: Burst-/Pulsverhalten der Ansteuerung.\n\nWie: PRF/Duty-Interpretation des geladenen Programms.\n\nCALIBRATION.",
+    "info_fsm": "Was: Finite-State-Machine der Sonotrode (Zustände).\n\nWie: FSM-Übergänge (Kontakt, Limits, Dock).\n\nCALIBRATION."
   }
 }

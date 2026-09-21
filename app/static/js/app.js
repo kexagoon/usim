@@ -863,7 +863,7 @@
       const [spec, glue, ti, field, dia, f0c, prof] = await Promise.all([
         getJSON("/api/bowl/spectrum?n=161&span=" + span, signal),
         postJSON("/api/bowl/sweep", { kind: "glue", n: 36 }, signal),
-        postJSON("/api/bowl/sweep", { kind: "titanium", n: 36 }, signal),
+        postJSON("/api/bowl/sweep", { kind: "titanium", h_min_m: 5e-5, h_max_m: 3e-3, n: 100 }, signal),
         getJSON("/api/bowl/field?nx=48&nr=24", signal),
         postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 }, signal),
         postJSON("/api/bowl/sweep", { kind: "f0", n: 4 }, signal),
@@ -1239,6 +1239,181 @@
   document.querySelectorAll("#bowlPresets .preset-btn").forEach((b) => b.addEventListener("click", () => loadBowlPreset(b.dataset.preset)));
   if ($("btnBowlCompare")) $("btnBowlCompare").addEventListener("click", runBowlCompare);
   if ($("f0Select")) $("f0Select").addEventListener("change", applySettings);
+
+
+  /* ========== Chart expand / info modal ========== */
+  let modalChart = null;
+  const CHART_CAPTION_KEY = {
+    chartBowlSpectrum: "bowl.caption_spectrum",
+    chartBowlGlue: "bowl.caption_glue",
+    chartBowlTi: "bowl.caption_ti",
+    chartBowlEnergy: "bowl.caption_energy",
+    chartBowlField: "bowl.caption_field",
+    chartBowlDia: "bowl.caption_dia",
+    chartBowlF0: "bowl.caption_f0",
+    chartBowlProfile: "bowl.caption_profile",
+    chartBowlPhase: "bowl.caption_phase",
+    chartBowlTemps: "bowl.caption_temps",
+    chartBowlPacEta: "bowl.caption_pac_eta",
+    chartBowlDerate: "bowl.caption_derate",
+    chartBowlLosses: "bowl.caption_losses",
+    chartIx: "captions.i_x",
+    chartTx: "captions.t_x",
+    chartDose: "captions.dose",
+    chartSoc: "captions.soc",
+    chartBurst: "captions.burst",
+    chartFsm: "captions.fsm",
+  };
+  const CHART_INSTANCE_MAP = {
+    chartBowlSpectrum: () => bowlCharts.spectrum,
+    chartBowlGlue: () => bowlCharts.glue,
+    chartBowlTi: () => bowlCharts.ti,
+    chartBowlEnergy: () => bowlCharts.energy,
+    chartBowlField: () => bowlCharts.field,
+    chartBowlDia: () => bowlCharts.dia,
+    chartBowlF0: () => bowlCharts.f0,
+    chartBowlProfile: () => bowlCharts.profile,
+    chartBowlPhase: () => bowlCharts.phase,
+    chartBowlTemps: () => bowlCharts.temps,
+    chartBowlPacEta: () => bowlCharts.pacEta,
+    chartBowlDerate: () => bowlCharts.derate,
+    chartBowlLosses: () => bowlCharts.losses,
+    chartIx: () => therapyCharts.ix,
+    chartTx: () => therapyCharts.tx,
+    chartDose: () => therapyCharts.dose,
+    chartSoc: () => therapyCharts.soc,
+    chartBurst: () => therapyCharts.burst,
+    chartFsm: () => therapyCharts.fsm,
+  };
+
+  function cloneChartConfig(src) {
+    if (!src) return null;
+    const labels = Array.isArray(src.data.labels) ? src.data.labels.slice() : [];
+    const datasets = (src.data.datasets || []).map((ds) => {
+      const copy = Object.assign({}, ds);
+      copy.data = Array.isArray(ds.data) ? ds.data.slice() : ds.data;
+      if (Array.isArray(ds.backgroundColor)) copy.backgroundColor = ds.backgroundColor.slice();
+      if (Array.isArray(ds.borderColor)) copy.borderColor = ds.borderColor.slice();
+      return copy;
+    });
+    let options;
+    try {
+      options = JSON.parse(JSON.stringify(src.options || {}));
+    } catch (_) {
+      options = { responsive: true, maintainAspectRatio: false, animation: false };
+    }
+    options.responsive = true;
+    options.maintainAspectRatio = false;
+    options.animation = false;
+    return { type: src.config.type, data: { labels, datasets }, options };
+  }
+
+  function resolveChartTitle(canvasId, infoKey) {
+    const btn = document.querySelector('[data-chart-expand="' + canvasId + '"]');
+    const head = btn && btn.closest(".chart-card");
+    const titleEl = head && head.querySelector(".card-title");
+    if (titleEl && titleEl.textContent.trim()) return titleEl.textContent.trim();
+    const key = infoKey || "";
+    if (key.startsWith("bowl.info_")) {
+      const map = {
+        spectrum: "bowl.spectrum", glue: "bowl.sweep_glue", ti: "bowl.sweep_ti",
+        energy: "bowl.energy", field: "bowl.field", dia: "bowl.sweep_dia",
+        f0: "bowl.sweep_f0", profile: "bowl.profile", phase: "bowl.phase",
+        temps: "bowl.chart_temps", pacEta: "bowl.chart_pac_eta",
+        derate: "bowl.chart_derate", losses: "bowl.chart_losses",
+      };
+      return t(map[key.replace("bowl.info_", "")] || key);
+    }
+    return canvasId;
+  }
+
+  function formatInfoHtml(text) {
+    const s = String(text || "");
+    if (!s || s.startsWith("bowl.info_") || s.startsWith("therapy.info_")) {
+      return "<p><em>" + (s || "—") + "</em></p>";
+    }
+    return s.split(/\n\n+/).map((p) => {
+      const escaped = p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      if (/^CALIBRATION|^КАЛИБРОВКА|^KALIBRIERUNG/i.test(p.trim())) {
+        return '<span class="info-calib">' + escaped.trim() + "</span>";
+      }
+      return "<p>" + escaped.replace(/\n/g, "<br>") + "</p>";
+    }).join("");
+  }
+
+  function openChartModal(canvasId, infoKey) {
+    if (String(canvasId || "").indexOf("Bowl") >= 0) {
+      try { ensureBowl(); } catch (_) { /* ignore */ }
+    }
+    const getter = CHART_INSTANCE_MAP[canvasId];
+    const src = getter ? getter() : null;
+    const modal = $("chartModal");
+    const canvas = $("chartModalCanvas");
+    if (!modal || !canvas) return;
+    $("chartModalTitle").textContent = resolveChartTitle(canvasId, infoKey);
+    const capKey = CHART_CAPTION_KEY[canvasId];
+    const cap = capKey ? t(capKey) : "";
+    $("chartModalCaption").textContent = (cap && cap !== capKey) ? cap : "";
+    $("chartModalInfo").innerHTML = formatInfoHtml(t(infoKey || ""));
+
+    if (modalChart) {
+      try { modalChart.destroy(); } catch (_) { /* ignore */ }
+      modalChart = null;
+    }
+    const cfg = cloneChartConfig(src);
+    if (cfg) {
+      modalChart = new Chart(canvas, cfg);
+    } else {
+      modalChart = new Chart(canvas, {
+        type: "line",
+        data: { labels: [], datasets: [{ label: "—", data: [], borderColor: "#3b9eff", pointRadius: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
+      });
+    }
+    modal.classList.remove("hidden");
+    modal.removeAttribute("hidden");
+    document.body.style.overflow = "hidden";
+    requestAnimationFrame(() => {
+      try { if (modalChart) { modalChart.resize(); modalChart.update("none"); } } catch (_) { /* ignore */ }
+    });
+  }
+
+  function closeChartModal() {
+    const modal = $("chartModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("hidden", "");
+    document.body.style.overflow = "";
+    if (modalChart) {
+      try { modalChart.destroy(); } catch (_) { /* ignore */ }
+      modalChart = null;
+    }
+  }
+
+  document.addEventListener("click", (ev) => {
+    const expandBtn = ev.target.closest("[data-chart-expand]");
+    if (expandBtn) {
+      ev.preventDefault();
+      openChartModal(expandBtn.getAttribute("data-chart-expand"), expandBtn.getAttribute("data-info-key"));
+      return;
+    }
+    const infoBtn = ev.target.closest("[data-chart-info]");
+    if (infoBtn) {
+      ev.preventDefault();
+      openChartModal(infoBtn.getAttribute("data-chart-info"), infoBtn.getAttribute("data-info-key"));
+      return;
+    }
+    if (ev.target.closest("[data-modal-close]")) {
+      ev.preventDefault();
+      closeChartModal();
+    }
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    const modal = $("chartModal");
+    if (modal && !modal.classList.contains("hidden")) closeChartModal();
+  });
+
 
   document.documentElement.setAttribute("data-theme", localStorage.getItem(THEME_KEY) || "dark");
   $("bowlPiezoH").disabled = true;

@@ -60,6 +60,7 @@ def test_build_stamp_temps_chart_fix():
     r = client.get("/api/build")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.2.4-temps-chart-fix"
-    assert "temps-chart-fix" in body["usim_build"]
-    assert "heating" in body.get("note", "").lower() or "temps" in body.get("note", "").lower()
+    assert body["version"] == "1.3.0-chart-expand"
+    assert "chart-fullscreen" in body["usim_build"]
+    note = body.get("note", "").lower()
+    assert "fullscreen" in note or "chart" in note or "ti" in note

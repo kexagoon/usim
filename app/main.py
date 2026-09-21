@@ -51,9 +51,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.2.4-temps-chart-fix",
-            "usim_build": _os.environ.get("USIM_BUILD", "temps-chart-fix-2026-09-18"),
-            "note": "Heating charts (temps/Zeitverlauf) reliable on Analysieren; bumpChart + transient-first 2026-09-18",
+            "version": "1.3.0-chart-expand",
+            "usim_build": _os.environ.get("USIM_BUILD", "chart-fullscreen-2026-09-21"),
+            "note": "Chart fullscreen+info modal; wide Ti sweep ~0.05–3.0 mm; bumpChart analyze-on-demand 2026-09-21",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -582,8 +582,8 @@ async def api_bowl_sweep(body: BowlSweepIn) -> dict[str, Any]:
         data = bowl.compare_frequencies()
         data["kind"] = "f0"
     else:
-        h_min = body.h_min_m if body.h_min_m is not None else 1e-4
-        h_max = body.h_max_m if body.h_max_m is not None else 1e-3
+        h_min = body.h_min_m if body.h_min_m is not None else 5e-5
+        h_max = body.h_max_m if body.h_max_m is not None else 3e-3
         data = bowl.sweep_titanium(h_min, h_max, n=body.n)
         data["kind"] = "titanium"
     data["calibration"] = True

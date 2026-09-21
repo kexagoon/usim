@@ -384,32 +384,68 @@
 
       <div class="chart-grid" aria-label="Therapy plots">
         <div class="chart-card">
-          <h3 class="card-title">I(x)</h3>
+          <div class="card-head">
+            <h3 class="card-title">I(x)</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartIx" data-info-key="therapy.info_ix" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartIx" data-info-key="therapy.info_ix" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartIx"></canvas></div>
           <p class="caption" data-i18n="captions.i_x"></p>
         </div>
         <div class="chart-card">
-          <h3 class="card-title">T(x)</h3>
+          <div class="card-head">
+            <h3 class="card-title">T(x)</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartTx" data-info-key="therapy.info_tx" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartTx" data-info-key="therapy.info_tx" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartTx"></canvas></div>
           <p class="caption" data-i18n="captions.t_x"></p>
         </div>
         <div class="chart-card">
-          <h3 class="card-title">Dose</h3>
+          <div class="card-head">
+            <h3 class="card-title">Dose</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartDose" data-info-key="therapy.info_dose" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartDose" data-info-key="therapy.info_dose" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartDose"></canvas></div>
           <p class="caption" data-i18n="captions.dose"></p>
         </div>
         <div class="chart-card">
-          <h3 class="card-title">SoC</h3>
+          <div class="card-head">
+            <h3 class="card-title">SoC</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartSoc" data-info-key="therapy.info_soc" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartSoc" data-info-key="therapy.info_soc" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartSoc"></canvas></div>
           <p class="caption" data-i18n="captions.soc"></p>
         </div>
         <div class="chart-card">
-          <h3 class="card-title">Burst</h3>
+          <div class="card-head">
+            <h3 class="card-title">Burst</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartBurst" data-info-key="therapy.info_burst" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartBurst" data-info-key="therapy.info_burst" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartBurst"></canvas></div>
           <p class="caption" data-i18n="captions.burst"></p>
         </div>
         <div class="chart-card">
-          <h3 class="card-title">FSM</h3>
+          <div class="card-head">
+            <h3 class="card-title">FSM</h3>
+            <div class="chart-tools">
+              <button type="button" class="chart-tool-btn" data-chart-expand="chartFsm" data-info-key="therapy.info_fsm" title="Expand" aria-label="Expand"><span aria-hidden="true">⛶</span></button>
+              <button type="button" class="chart-tool-btn" data-chart-info="chartFsm" data-info-key="therapy.info_fsm" title="Info" aria-label="Info"><span aria-hidden="true">ⓘ</span></button>
+            </div>
+          </div>
           <div class="chart-wrap"><canvas id="chartFsm"></canvas></div>
           <p class="caption" data-i18n="captions.fsm"></p>
         </div>
@@ -513,7 +549,7 @@
               </div>
               <label><span class="label-row"><span data-i18n="bowl.ti_h">Ti bottom (mm)</span>
                 <span class="info" data-i18n-title="bowl.help_ti" title="">?</span></span>
-                <input type="number" id="bowlTiH" min="0.1" max="1.0" step="0.05" value="0.3" />
+                <input type="number" id="bowlTiH" min="0.05" max="3.0" step="0.05" value="0.3" />
                 <small class="help" data-i18n="bowl.help_ti"></small>
               </label>
               <label><span class="label-row"><span data-i18n="bowl.cup_outer_d">Cup outer Ø (mm)</span>
@@ -791,22 +827,62 @@
 
         <div class="chart-grid">
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.spectrum">Spectrum</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.spectrum">Spectrum</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlSpectrum" data-info-key="bowl.info_spectrum" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlSpectrum" data-info-key="bowl.info_spectrum" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlSpectrum"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_spectrum"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.sweep_glue">Glue sweep</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.sweep_glue">Glue sweep</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlGlue" data-info-key="bowl.info_glue" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlGlue" data-info-key="bowl.info_glue" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlGlue"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_glue"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.sweep_ti">Ti sweep</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.sweep_ti">Ti sweep</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlTi" data-info-key="bowl.info_ti" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlTi" data-info-key="bowl.info_ti" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlTi"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_ti"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.energy">Energy</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.energy">Energy</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlEnergy" data-info-key="bowl.info_energy" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlEnergy" data-info-key="bowl.info_energy" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="energy-toolbar">
               <div class="preset-chips" id="bowlEnergyPhase" role="group">
                 <button type="button" class="preset-chip active" data-phase="end" data-i18n="bowl.energy_phase_end">Ende (nach Zeit)</button>
@@ -819,47 +895,137 @@
             <p class="caption muted" data-i18n="bowl.caption_energy_sync"></p>
           </section>
           <section class="chart-card wide">
-            <h2 class="card-title" data-i18n="bowl.field">Near-field</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.field">Near-field</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlField" data-info-key="bowl.info_field" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlField" data-info-key="bowl.info_field" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap field-wrap"><canvas id="chartBowlField"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_field"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.sweep_dia">Piezo-Durchmesser</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.sweep_dia">Piezo-Durchmesser</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlDia" data-info-key="bowl.info_dia" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlDia" data-info-key="bowl.info_dia" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlDia"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_dia"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.sweep_f0">f0 Vergleich 1/3/10/19</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.sweep_f0">f0 Vergleich 1/3/10/19</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlF0" data-info-key="bowl.info_f0" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlF0" data-info-key="bowl.info_f0" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlF0"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_f0"></p>
           </section>
           <section class="chart-card wide">
-            <h2 class="card-title" data-i18n="bowl.profile">Druckprofil (1D)</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.profile">Druckprofil (1D)</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlProfile" data-info-key="bowl.info_profile" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlProfile" data-info-key="bowl.info_profile" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlProfile"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_profile"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.phase">Phase Z_in / T</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.phase">Phase Z_in / T</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlPhase" data-info-key="bowl.info_phase" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlPhase" data-info-key="bowl.info_phase" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlPhase"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_phase"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.chart_temps">Temperaturen vs Zeit</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.chart_temps">Temperaturen vs Zeit</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlTemps" data-info-key="bowl.info_temps" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlTemps" data-info-key="bowl.info_temps" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlTemps"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_temps"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.chart_pac_eta">P_ac &amp; η vs Zeit</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.chart_pac_eta">P_ac &amp; η vs Zeit</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlPacEta" data-info-key="bowl.info_pacEta" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlPacEta" data-info-key="bowl.info_pacEta" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlPacEta"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_pac_eta"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.chart_derate">Drive / Derate vs Zeit</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.chart_derate">Drive / Derate vs Zeit</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlDerate" data-info-key="bowl.info_derate" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlDerate" data-info-key="bowl.info_derate" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlDerate"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_derate"></p>
           </section>
           <section class="chart-card">
-            <h2 class="card-title" data-i18n="bowl.chart_losses">Verluste / Kleberfaktor vs Zeit</h2>
+            <div class="card-head">
+              <h2 class="card-title" data-i18n="bowl.chart_losses">Verluste / Kleberfaktor vs Zeit</h2>
+              <div class="chart-tools">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlLosses" data-info-key="bowl.info_losses" title="Expand" aria-label="Expand">
+                  <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlLosses" data-info-key="bowl.info_losses" title="Info" aria-label="Info">
+                  <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
+                </button>
+              </div>
+            </div>
             <div class="chart-wrap tall"><canvas id="chartBowlLosses"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_losses"></p>
           </section>
@@ -867,6 +1033,28 @@
       </div>
     </div>
   </main>
+
+
+  <!-- Chart expand / info modal -->
+  <div id="chartModal" class="chart-modal hidden" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle" hidden>
+    <div class="chart-modal-backdrop" data-modal-close="1"></div>
+    <div class="chart-modal-panel">
+      <header class="chart-modal-header">
+        <h2 id="chartModalTitle" class="chart-modal-title">Chart</h2>
+        <button type="button" class="chart-modal-close" data-modal-close="1" aria-label="Close" title="Close">
+          <span aria-hidden="true">×</span>
+          <span class="sr-only" data-i18n="bowl.modal_close">Close</span>
+        </button>
+      </header>
+      <div class="chart-modal-body">
+        <div class="chart-modal-canvas-wrap">
+          <canvas id="chartModalCanvas"></canvas>
+        </div>
+        <aside class="chart-modal-info" id="chartModalInfo" aria-live="polite"></aside>
+      </div>
+      <p class="chart-modal-caption" id="chartModalCaption"></p>
+    </div>
+  </div>
 
   <script>
     window.__I18N__ = {{ i18n | tojson }};
