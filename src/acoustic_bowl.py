@@ -135,6 +135,11 @@ class BowlParams:
     glue_spread_scenario: str = "ideal"
     # Contact / coverage fraction 0.2…1.0 (used strongly by islands / thin_wet)
     glue_coverage: float = 1.0
+    # Bonding pressure while curing piezo onto Ti (CALIBRATION_PRESET)
+    # strong | medium | weak → contact / G_thermal / mismatch / h_eff
+    glue_press: str = "medium"
+    # Cure / drying degree 0…1 (1 = fully cured). Also accepts UI % / named chips.
+    glue_cure_fraction: float = 1.0
 
     def resolved_piezo_thickness(self, c_pzt: float) -> float:
         if self.piezo_thickness_m is not None and self.piezo_thickness_m > 0:
@@ -322,6 +327,8 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         "loads": ["air", "water", "gel", "soft_tissue", "fat", "bone", "gel_tissue"],
         "backing_options": ["air", "heavy"],
         "glue_spread_scenarios": list(GLUE_SPREAD_SCENARIOS),
+        "glue_press_options": list(GLUE_PRESS_OPTIONS),
+        "glue_cure_presets": {"cured": 1.0, "partial": 0.55, "uncured": 0.15},
         "glue_spread_defaults": {
             k: {
                 "coverage": resolve_glue_spread(k).coverage,
@@ -371,13 +378,17 @@ GLUE_SPREAD_SCENARIOS = (
 )
 
 
+GLUE_PRESS_OPTIONS = ("strong", "medium", "weak")
+
+
 @dataclass(frozen=True)
 class GlueSpreadFactors:
-    """Resolved multipliers for energy_partition + lumped thermal bond.
+    """Resolved multipliers for energy_partition + lumped thermal + layer stack.
 
-    Wired to real model knobs: coverage→area_ratio/contact, attn_mul→α_glue,
-    mismatch_mul→mismatch_extra, h_eff_mul→loss path thickness, w_*→remain
-    weights, g_*_mul→thermal G_pg / G_gt, vol_mul→glue heat capacity volume.
+    Wired to real model knobs: coverage→area_ratio/contact/layer Ø, attn_mul→α_glue,
+    mismatch_mul→mismatch_extra, h_eff_mul→glue thickness in stack + loss path,
+    w_*→remain weights, g_*_mul→thermal G_pg / G_gt, vol_mul→glue heat capacity.
+    press / cure_fraction compose with glue_spread_scenario (CALIBRATION_PRESET).
     """
 
     key: str
@@ -391,13 +402,74 @@ class GlueSpreadFactors:
     g_pg_mul: float
     g_gt_mul: float
     vol_mul: float
+    press: str = "medium"
+    cure_fraction: float = 1.0
+
+
+def normalize_glue_press(press: str | None) -> str:
+    key = (press or "medium").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "stark": "strong",
+        "fest": "strong",
+        "hard": "strong",
+        "high": "strong",
+        "kräftig": "strong",
+        "kräftig_andrücken": "strong",
+        "mittel": "medium",
+        "normal": "medium",
+        "nom": "medium",
+        "schwach": "weak",
+        "leicht": "weak",
+        "soft": "weak",
+        "low": "weak",
+        "light": "weak",
+    }
+    key = aliases.get(key, key)
+    return key if key in GLUE_PRESS_OPTIONS else "medium"
+
+
+def normalize_glue_cure(cure: float | str | None) -> float:
+    """Return cure fraction 0…1 (1 = fully cured)."""
+    if cure is None:
+        return 1.0
+    if isinstance(cure, str):
+        s = cure.strip().lower().replace("-", "_").replace(" ", "_")
+        named = {
+            "cured": 1.0,
+            "fully": 1.0,
+            "fully_cured": 1.0,
+            "ausgehartet": 1.0,
+            "voll": 1.0,
+            "vollständig": 1.0,
+            "partial": 0.55,
+            "partially": 0.55,
+            "teilweise": 0.55,
+            "halb": 0.55,
+            "uncured": 0.15,
+            "wet": 0.15,
+            "nass": 0.15,
+            "frisch": 0.15,
+            "uncured_wet": 0.15,
+        }
+        if s in named:
+            return float(named[s])
+        try:
+            cure = float(s.replace("%", ""))
+        except ValueError:
+            return 1.0
+    v = float(cure)
+    if v > 1.0:  # UI percent 0…100
+        v = v / 100.0
+    return float(np.clip(v, 0.0, 1.0))
 
 
 def resolve_glue_spread(
     scenario: str | None,
     coverage: float | None = None,
+    press: str | None = None,
+    cure_fraction: float | str | None = None,
 ) -> GlueSpreadFactors:
-    """Map named glue-spread scenario (+ optional coverage) to physics multipliers."""
+    """Map spread scenario + coverage + press + cure → physics multipliers."""
     key = (scenario or "ideal").strip().lower().replace("-", "_").replace(" ", "_")
     aliases = {
         "gleichmaessig": "ideal",
@@ -476,18 +548,76 @@ def resolve_glue_spread(
         else:
             # Blend scenario default with UI slider (geometric mean keeps both meaningful)
             base["coverage"] = float(np.clip(math.sqrt(base["coverage"] * cov), 0.2, 1.0))
+    # --- Press (bonding pressure piezo→Ti) CALIBRATION_PRESET ---
+    press_key = normalize_glue_press(press)
+    press_table = {
+        "strong": dict(
+            coverage_mul=1.08, attn_mul=0.90, mismatch_mul=0.82, h_eff_mul=0.88,
+            w_glue_mul=0.92, w_pzt_mul=1.0, w_ti_mul=1.0,
+            g_pg_mul=1.30, g_gt_mul=1.30, vol_mul=1.05,
+        ),
+        "medium": dict(
+            coverage_mul=1.0, attn_mul=1.0, mismatch_mul=1.0, h_eff_mul=1.0,
+            w_glue_mul=1.0, w_pzt_mul=1.0, w_ti_mul=1.0,
+            g_pg_mul=1.0, g_gt_mul=1.0, vol_mul=1.0,
+        ),
+        "weak": dict(
+            coverage_mul=0.72, attn_mul=1.18, mismatch_mul=1.40, h_eff_mul=1.22,
+            w_glue_mul=1.12, w_pzt_mul=1.05, w_ti_mul=1.05,
+            g_pg_mul=0.60, g_gt_mul=0.60, vol_mul=0.82,
+        ),
+    }
+    pt = press_table[press_key]
+    cov = float(np.clip(base["coverage"] * pt["coverage_mul"], 0.2, 1.0))
+    attn = float(base["attn_mul"] * pt["attn_mul"])
+    mismatch = float(base["mismatch_mul"] * pt["mismatch_mul"])
+    h_eff = float(base["h_eff_mul"] * pt["h_eff_mul"])
+    w_glue = float(base["w_glue_mul"] * pt["w_glue_mul"])
+    w_pzt = float(base["w_pzt_mul"] * pt["w_pzt_mul"])
+    w_ti = float(base["w_ti_mul"] * pt["w_ti_mul"])
+    g_pg = float(base["g_pg_mul"] * pt["g_pg_mul"])
+    g_gt = float(base["g_gt_mul"] * pt["g_gt_mul"])
+    vol = float(base["vol_mul"] * pt["vol_mul"])
+
+    # --- Cure / drying degree: 1=fully cured, 0=uncured/wet ---
+    cure = normalize_glue_cure(cure_fraction)
+    # Uncured reference multipliers (lerp → 1.0 as cure→1)
+    u_attn, u_mis, u_g, u_w, u_vol = 1.85, 1.55, 0.42, 1.40, 1.15
+    def _lerp_u(u: float, c: float) -> float:
+        return float(u + (1.0 - u) * c)
+    attn *= _lerp_u(u_attn, cure)
+    mismatch *= _lerp_u(u_mis, cure)
+    g_pg *= _lerp_u(u_g, cure)
+    g_gt *= _lerp_u(u_g, cure)
+    w_glue *= _lerp_u(u_w, cure)
+    vol *= _lerp_u(u_vol, cure)
+    # Partial cure also reduces effective contact a bit
+    cov = float(np.clip(cov * (0.75 + 0.25 * cure), 0.2, 1.0))
+
     return GlueSpreadFactors(
         key=key,
-        coverage=float(np.clip(base["coverage"], 0.2, 1.0)),
-        attn_mul=float(base["attn_mul"]),
-        mismatch_mul=float(base["mismatch_mul"]),
-        h_eff_mul=float(base["h_eff_mul"]),
-        w_glue_mul=float(base["w_glue_mul"]),
-        w_pzt_mul=float(base["w_pzt_mul"]),
-        w_ti_mul=float(base["w_ti_mul"]),
-        g_pg_mul=float(base["g_pg_mul"]),
-        g_gt_mul=float(base["g_gt_mul"]),
-        vol_mul=float(base["vol_mul"]),
+        coverage=cov,
+        attn_mul=float(max(0.2, attn)),
+        mismatch_mul=float(max(0.2, mismatch)),
+        h_eff_mul=float(max(0.3, h_eff)),
+        w_glue_mul=float(max(0.2, w_glue)),
+        w_pzt_mul=float(max(0.2, w_pzt)),
+        w_ti_mul=float(max(0.2, w_ti)),
+        g_pg_mul=float(max(0.15, g_pg)),
+        g_gt_mul=float(max(0.15, g_gt)),
+        vol_mul=float(max(0.2, vol)),
+        press=press_key,
+        cure_fraction=cure,
+    )
+
+
+def bond_factors_from_params(p: Any) -> GlueSpreadFactors:
+    """Compose spread + coverage + press + cure from BowlParams (or duck type)."""
+    return resolve_glue_spread(
+        getattr(p, "glue_spread_scenario", "ideal"),
+        getattr(p, "glue_coverage", 1.0),
+        getattr(p, "glue_press", "medium"),
+        getattr(p, "glue_cure_fraction", 1.0),
     )
 
 
@@ -567,13 +697,33 @@ class AcousticBowl:
         """Acoustic axis stack: [backing] → piezo → glue → Ti bottom → [match] → load.
 
         Cup side walls are electrical return only (not in this 1D path).
+        Bond state (spread/press/cure/coverage) scales glue h, α, Z and contact Ø
+        so spectrum / |T| / Z also see bond quality — not only energy_partition.
         """
         p = self.params
         mats = self._materials()
+        gs = bond_factors_from_params(p)
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
         d_inner = p.cup_inner_diameter_m if p.cup_inner_diameter_m > 0 else p.ti_diameter_m
         d_outer = p.cup_outer_diameter_m if p.cup_outer_diameter_m > 0 else p.ti_diameter_m
         d_piezo = min(p.piezo_diameter_m, d_inner, d_outer)
+        # Effective contact diameter from coverage (islands / weak press / uncured)
+        d_glue = float(d_piezo * math.sqrt(max(gs.coverage, 0.2)))
+        h_glue = max(p.glue_thickness_m * gs.h_eff_mul, 1e-9)
+        glue_src = mats["glue"]
+        glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
+        glue_scale = max(0.2, min(5.0, glue_scale))
+        # Educational Z drop for incomplete wetting / air inclusions
+        z_scale = float(0.55 + 0.45 * gs.coverage)
+        glue_mat = Material(
+            glue_src.name,
+            glue_src.rho_kg_m3,
+            glue_src.c_m_s,
+            glue_src.z_mrayl * z_scale,
+            glue_src.attenuation_np_m_mhz * gs.attn_mul * glue_scale,
+            glue_src.key,
+            glue_src.kt,
+        )
         layers: list[BowlLayer] = []
         # Optional backing behind piezo (affects bandwidth via energy model; shown in schematic)
         if p.backing == "heavy":
@@ -581,7 +731,7 @@ class AcousticBowl:
         layers.extend(
             [
                 BowlLayer("pzt", mats["pzt"], h_pzt, d_piezo),
-                BowlLayer("glue", mats["glue"], max(p.glue_thickness_m, 1e-9), d_piezo),
+                BowlLayer("glue", glue_mat, h_glue, d_glue),
                 # Ti bottom of half-cup — primary radiating wall (outer face → load)
                 BowlLayer("ti_bottom", mats["titanium"], p.ti_thickness_m, d_outer),
             ]
@@ -619,6 +769,8 @@ class AcousticBowl:
             "glue_thickness_m": p.glue_thickness_m,
             "glue_spread_scenario": getattr(p, "glue_spread_scenario", "ideal"),
             "glue_coverage": getattr(p, "glue_coverage", 1.0),
+            "glue_press": getattr(p, "glue_press", "medium"),
+            "glue_cure_fraction": float(getattr(p, "glue_cure_fraction", 1.0) or 1.0),
             "pcb_drive_v": p.pcb_drive_v,
             "p_elec_max_w": p.p_elec_max_w,
             "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
@@ -807,10 +959,7 @@ class AcousticBowl:
         h_glue = p.glue_thickness_m
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
         h_ti = p.ti_thickness_m
-        gs = resolve_glue_spread(
-            getattr(p, "glue_spread_scenario", "ideal"),
-            getattr(p, "glue_coverage", 1.0),
-        )
+        gs = bond_factors_from_params(p)
         glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
         glue_scale = max(0.2, min(5.0, glue_scale)) * gs.attn_mul
         glue_scale = max(0.2, min(5.0, glue_scale))
@@ -1222,6 +1371,8 @@ class AcousticBowl:
                 "glue_attn_scale": float(getattr(p, "glue_attn_scale", 1.0) or 1.0),
                 "glue_spread_scenario": str(getattr(p, "glue_spread_scenario", "ideal") or "ideal"),
                 "glue_coverage": float(getattr(p, "glue_coverage", 1.0) or 1.0),
+                "glue_press": str(getattr(p, "glue_press", "medium") or "medium"),
+                "glue_cure_fraction": float(getattr(p, "glue_cure_fraction", 1.0) or 1.0),
                 "gel_thickness_m": p.gel_thickness_m,
                 "matching_enabled": p.matching_enabled,
                 "matching_material": p.matching_material,
@@ -1342,6 +1493,8 @@ def bowl_params_from_dict(
         "glue_attn_scale": float,
         "glue_spread_scenario": str,
         "glue_coverage": float,
+        "glue_press": str,
+        "glue_cure_fraction": float,
     }
     for key, caster in mapping.items():
         if key in data and data[key] is not None:
@@ -1398,7 +1551,7 @@ def bowl_params_from_dict(
     p.sync_cup_radiator()
     p.drive_level = float(np.clip(p.drive_level, 0.0, 1.0))
     p.matching_thickness_m = float(np.clip(p.matching_thickness_m, 1e-6, 5e-4))
-    p.spectrum_span = float(np.clip(p.spectrum_span, 0.05, 0.5))
+    p.spectrum_span = float(np.clip(p.spectrum_span, 0.05, 0.9))
     p.pcb_drive_v = float(np.clip(p.pcb_drive_v, 1.0, 100.0))
     p.p_elec_max_w = float(np.clip(p.p_elec_max_w, 0.5, 50.0))
     p.r_wire_piezo_ohm = float(np.clip(p.r_wire_piezo_ohm, 0.0, 50.0))
@@ -1408,6 +1561,8 @@ def bowl_params_from_dict(
     scen = str(getattr(p, "glue_spread_scenario", "ideal") or "ideal")
     p.glue_spread_scenario = resolve_glue_spread(scen).key
     p.glue_coverage = float(np.clip(float(getattr(p, "glue_coverage", 1.0) or 1.0), 0.2, 1.0))
+    p.glue_press = normalize_glue_press(getattr(p, "glue_press", "medium"))
+    p.glue_cure_fraction = normalize_glue_cure(getattr(p, "glue_cure_fraction", 1.0))
     p.f0_hz = validate_f0(p.f0_hz)
     if p.backing not in ("air", "heavy"):
         p.backing = "air"

@@ -20,6 +20,7 @@ from src.simulation import Simulation, SimulationConfig
 from src.acoustic_bowl import (
     AcousticBowl,
     apply_named_preset,
+    bond_factors_from_params,
     bowl_params_from_dict,
     compare_bowl_presets,
     default_bowl_params,
@@ -52,9 +53,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.3.2-energy-glue",
-            "usim_build": _os.environ.get("USIM_BUILD", "energy-refresh-glue-2026-09-22"),
-            "note": "Energieaufteilung dedicated refresh+destroy/recreate; glue_spread_scenario piezo↔Ti; /api/bowl/energy; 2026-09-22",
+            "version": "1.3.3-bond-wide",
+            "usim_build": _os.environ.get("USIM_BUILD", "bond-press-cure-wide-2026-09-22"),
+            "note": "Energy bar recreate anti-freeze; glue press+cure+spread→all acoustic charts; fullscreen wide data; default Akustik-Schale; 2026-09-22",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -428,6 +429,8 @@ class BowlParamsIn(BaseModel):
     glue_attn_scale: float | None = None
     glue_spread_scenario: str | None = None
     glue_coverage: float | None = None
+    glue_press: str | None = None
+    glue_cure_fraction: float | None = None
     # Thermal / transient calib (applied on Analysieren with other settings)
     t_amb_c: float | None = None
     t_warn_c: float | None = None
@@ -539,7 +542,7 @@ async def api_bowl_params_post(body: BowlParamsIn) -> dict[str, Any]:
 @app.get("/api/bowl/spectrum")
 async def api_bowl_spectrum(
     n: int = Query(201, ge=21, le=1001),
-    span: float = Query(0.15, ge=0.02, le=0.5),
+    span: float = Query(0.15, ge=0.02, le=0.9),
 ) -> dict[str, Any]:
     bowl = _get_bowl()
     f0 = bowl.params.f0_hz
@@ -599,9 +602,10 @@ async def api_bowl_sweep(body: BowlSweepIn) -> dict[str, Any]:
 async def api_bowl_field(
     nx: int = Query(50, ge=10, le=120),
     nr: int = Query(40, ge=10, le=100),
+    z_max_m: float | None = Query(None, ge=0.001, le=0.08),
 ) -> dict[str, Any]:
     bowl = _get_bowl()
-    field = bowl.near_field_map(nx=nx, nr=nr)
+    field = bowl.near_field_map(nx=nx, nr=nr, z_max_m=z_max_m)
     field["calibration"] = True
     field["energy"] = bowl.to_api_dict()["energy"]
     return field
@@ -759,10 +763,7 @@ async def api_bowl_energy_post(body: BowlEnergyIn | None = None) -> dict[str, An
         _bowl_thermal = thermal_params_from_dict(data, _bowl_thermal)
 
     bowl = _get_bowl()
-    gs = resolve_glue_spread(
-        getattr(bowl.params, "glue_spread_scenario", "ideal"),
-        getattr(bowl.params, "glue_coverage", 1.0),
-    )
+    gs = bond_factors_from_params(bowl.params)
     energy_start = _energy_dict(bowl.energy_partition())
     energy_end = dict(energy_start)
     heated = False
@@ -820,10 +821,14 @@ async def api_bowl_energy_post(body: BowlEnergyIn | None = None) -> dict[str, An
             "g_pg_mul": gs.g_pg_mul,
             "g_gt_mul": gs.g_gt_mul,
             "vol_mul": gs.vol_mul,
+            "press": gs.press,
+            "cure_fraction": gs.cure_fraction,
         },
         "params": {
             "glue_spread_scenario": getattr(bowl.params, "glue_spread_scenario", "ideal"),
             "glue_coverage": getattr(bowl.params, "glue_coverage", 1.0),
+            "glue_press": getattr(bowl.params, "glue_press", "medium"),
+            "glue_cure_fraction": getattr(bowl.params, "glue_cure_fraction", 1.0),
             "glue_thickness_m": bowl.params.glue_thickness_m,
             "glue_attn_scale": getattr(bowl.params, "glue_attn_scale", 1.0),
         },
@@ -836,10 +841,7 @@ async def api_bowl_energy_post(body: BowlEnergyIn | None = None) -> dict[str, An
 async def api_bowl_energy_get() -> dict[str, Any]:
     """Cold energy partition for current server bowl params (no transient)."""
     bowl = _get_bowl()
-    gs = resolve_glue_spread(
-        getattr(bowl.params, "glue_spread_scenario", "ideal"),
-        getattr(bowl.params, "glue_coverage", 1.0),
-    )
+    gs = bond_factors_from_params(bowl.params)
     e = _energy_dict(bowl.energy_partition())
     return {
         "calibration": True,
@@ -858,6 +860,8 @@ async def api_bowl_energy_get() -> dict[str, Any]:
             "g_pg_mul": gs.g_pg_mul,
             "g_gt_mul": gs.g_gt_mul,
             "vol_mul": gs.vol_mul,
+            "press": gs.press,
+            "cure_fraction": gs.cure_fraction,
         },
     }
 

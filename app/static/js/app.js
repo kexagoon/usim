@@ -149,34 +149,46 @@
     return recreateLineChart("chartBowlTemps", "temps", (el) => buildTempsChart(el));
   }
 
-  function buildEnergyChart(canvasEl) {
+  function energyChartLabels() {
+    return [
+      t("bowl.p_rad") || "P_ac",
+      t("bowl.p_glue") || "glue",
+      t("bowl.p_piezo") || "piezo",
+      t("bowl.p_ti") || "Ti",
+    ];
+  }
+
+  /** Horizontal bar (more reliable than doughnut under destroy/recreate races). */
+  function buildEnergyChart(canvasEl, dataArr) {
     const el = canvasEl || $("chartBowlEnergy");
     if (!el) return null;
+    try {
+      const existing = (typeof Chart.getChart === "function") ? Chart.getChart(el) : null;
+      if (existing) { try { existing.destroy(); } catch (_) { /* ignore */ } }
+    } catch (_) { /* ignore */ }
+    const data = Array.isArray(dataArr) ? dataArr.slice() : [0.25, 0.25, 0.25, 0.25];
     return new Chart(el, {
-      type: "doughnut",
+      type: "bar",
       data: {
-        labels: [
-          t("bowl.p_rad") || "P_ac",
-          t("bowl.p_glue") || "glue",
-          t("bowl.p_piezo") || "piezo",
-          t("bowl.p_ti") || "Ti",
-        ],
+        labels: energyChartLabels(),
         datasets: [{
-          data: [0.25, 0.25, 0.25, 0.25],
+          label: t("bowl.energy_share") || "W",
+          data: data,
           backgroundColor: ["#2dd4a8", "#c45c26", "#e6a817", "#8a9ba8"],
-          borderWidth: 2,
+          borderWidth: 1,
           borderColor: "#151d2c",
-          hoverOffset: 6,
+          borderRadius: 4,
         }],
       },
       options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
         animations: false,
         transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
         plugins: {
-          legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+          legend: { display: false },
           tooltip: {
             callbacks: {
               label(ctx) {
@@ -188,12 +200,16 @@
             },
           },
         },
+        scales: {
+          x: { beginAtZero: true, title: { display: true, text: "W" }, grid: { color: Chart.defaults.borderColor } },
+          y: { grid: { display: false } },
+        },
       },
     });
   }
 
-  function ensureEnergyChartFresh() {
-    return recreateLineChart("chartBowlEnergy", "energy", (el) => buildEnergyChart(el));
+  function ensureEnergyChartFresh(dataArr) {
+    return recreateLineChart("chartBowlEnergy", "energy", (el) => buildEnergyChart(el, dataArr));
   }
 
   function initTherapyCharts() {
@@ -513,6 +529,8 @@
       derate_smooth: !!($("bowlDerateSmooth") && $("bowlDerateSmooth").checked),
       glue_spread_scenario: (($("bowlGlueSpreadScenario") || { value: "ideal" }).value || "ideal"),
       glue_coverage: Math.max(0.2, Math.min(1, (parseFloat(($("bowlGlueCoverage") || { value: 100 }).value) || 100) / 100)),
+      glue_press: (($("bowlGluePress") || { value: "medium" }).value || "medium"),
+      glue_cure_fraction: Math.max(0, Math.min(1, (parseFloat(($("bowlGlueCure") || { value: 100 }).value) || 100) / 100)),
       duration_s: bowlDurationSeconds(),
       dt_s: parseFloat(($("bowlDtS") || { value: 0.15 }).value),
     };
@@ -590,6 +608,8 @@
     clampPiezoDiameter(false);
     $("bowlGlueH").value = ((p.glue_thickness_m || 1e-5) * 1e6).toFixed(0);
     if (p.glue_spread_scenario) setGlueSpreadScenario(p.glue_spread_scenario, false);
+    if (p.glue_press) setGluePress(p.glue_press, false);
+    if (p.glue_cure_fraction != null) setGlueCure(Math.round(Number(p.glue_cure_fraction) * 100), false);
     if (p.glue_coverage != null && $("bowlGlueCoverage")) {
       const pct = Math.round(Number(p.glue_coverage) * 100);
       $("bowlGlueCoverage").value = String(Math.max(20, Math.min(100, pct)));
@@ -735,7 +755,6 @@
       bowlCharts.glue.options.scales.x.title.text = t("bowl.glue_um");
     }
     if (bowlCharts.ti) bowlCharts.ti.options.scales.x.title.text = t("bowl.ti_mm");
-    if (bowlCharts.energy) bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
     try { applyEnergyDoughnut(); } catch (err) { console.warn(err); }
     if (bowlCharts.temps) {
       bowlCharts.temps.data.datasets[0].label = t("bowl.legend_t_piezo");
@@ -760,7 +779,10 @@
       bowlCharts.losses.data.datasets[3].label = t("bowl.legend_glue_factor");
       bowlCharts.losses.options.scales.x.title.text = t("bowl.time_s");
     }
-    Object.values(bowlCharts).forEach((ch) => bumpChart(ch));
+    Object.keys(bowlCharts).forEach((k) => {
+      if (k === "energy") return; // applyEnergyDoughnut already painted
+      bumpChart(bowlCharts[k]);
+    });
   }
 
   function drawSchematic(layers, geometry) {
@@ -867,29 +889,42 @@
     box.innerHTML = rows + `<div class="ed-total">${t("bowl.energy_total")}: ${sum.toFixed(4)} W</div>`;
   }
 
+  function cloneEnergyParts(src) {
+    if (!src || typeof src !== "object") return null;
+    return {
+      p_radiated_w: Number(src.p_radiated_w) || 0,
+      p_glue_loss_w: Number(src.p_glue_loss_w) || 0,
+      p_piezo_heat_w: Number(src.p_piezo_heat_w) || 0,
+      p_ti_loss_w: Number(src.p_ti_loss_w) || 0,
+      efficiency: Number(src.efficiency) || 0,
+      p_drive_w: Number(src.p_drive_w) || 0,
+    };
+  }
+
+  /**
+   * Always destroy+recreate energy bar with data baked into constructor.
+   * Never mutate shared cache arrays; abort-safe; no dead Chart leftovers.
+   */
   function applyEnergyDoughnut(phase, opts) {
     try {
       if (!bowlEnergyCache) bowlEnergyCache = { start: null, end: null };
       if (phase) bowlEnergyPhase = phase;
-      const recreate = !(opts && opts.recreate === false);
       const src = bowlEnergyCache[bowlEnergyPhase] || bowlEnergyCache.end || bowlEnergyCache.start;
       if (!src) {
+        ensureEnergyChartFresh([0.0001, 0, 0, 0]);
         renderEnergyDetail([0, 0, 0, 0]);
+        document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
+          b.classList.toggle("active", b.dataset.phase === bowlEnergyPhase);
+        });
         return;
       }
       const parts = energyParts(src);
-      // Chart.js hides an all-zero doughnut — keep a tiny placeholder only for empty state
       const allZero = parts.every((v) => v <= 0);
       const data = allZero ? [0.0001, 0, 0, 0] : freshArray(parts);
-      let ch = bowlCharts.energy;
-      if (recreate || !ch) {
-        ch = ensureEnergyChartFresh();
-      }
-      if (ch) {
-        ch.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
-        ch.data.datasets[0].data = data.slice();
-        if (typeof ch.resize === "function") ch.resize();
-        bumpChart(ch);
+      // Force recreate every paint (opts.recreate=false ignored for reliability)
+      const ch = ensureEnergyChartFresh(data);
+      if (ch && typeof ch.resize === "function") {
+        try { ch.resize(); } catch (_) { /* ignore */ }
       }
       renderEnergyDetail(allZero ? [0, 0, 0, 0] : parts);
       document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
@@ -897,6 +932,7 @@
       });
     } catch (err) {
       console.warn("applyEnergyDoughnut", err);
+      try { ensureEnergyChartFresh([0.25, 0.25, 0.25, 0.25]); } catch (_) { /* ignore */ }
     }
   }
 
@@ -925,14 +961,8 @@
       if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
       drawSchematic(result.layers || [], result.geometry || result.params || {});
       try {
-        bowlEnergyCache.start = {
-          p_radiated_w: energy.p_radiated_w || 0,
-          p_glue_loss_w: energy.p_glue_loss_w || 0,
-          p_piezo_heat_w: energy.p_piezo_heat_w || 0,
-          p_ti_loss_w: energy.p_ti_loss_w || 0,
-          efficiency: energy.efficiency || 0,
-        };
-        bowlEnergyCache.end = Object.assign({}, bowlEnergyCache.start);
+        bowlEnergyCache.start = cloneEnergyParts(energy);
+        bowlEnergyCache.end = cloneEnergyParts(energy);
         applyEnergyDoughnut(bowlEnergyPhase);
       } catch (err) { console.warn("energy cache", err); }
       // Thermal transient first so heating charts are not left last after many Chart.js updates
@@ -1035,7 +1065,7 @@
     const s = tr.series;
     const sum = tr.summary || {};
     // Synchronize Energieaufteilung with thermal run: start (cold) vs end (heated)
-    if (sum.energy_start) bowlEnergyCache.start = sum.energy_start;
+    if (sum.energy_start) bowlEnergyCache.start = cloneEnergyParts(sum.energy_start);
     else if ((s.P_ac_w || []).length) {
       bowlEnergyCache.start = {
         p_radiated_w: s.P_ac_w[0] || 0,
@@ -1045,7 +1075,7 @@
         efficiency: (s.eta || [])[0] || 0,
       };
     }
-    if (sum.energy_end) bowlEnergyCache.end = sum.energy_end;
+    if (sum.energy_end) bowlEnergyCache.end = cloneEnergyParts(sum.energy_end);
     else if ((s.P_ac_w || []).length) {
       const n = s.P_ac_w.length - 1;
       bowlEnergyCache.end = {
@@ -1056,9 +1086,8 @@
         efficiency: (s.eta || [])[n] || 0,
       };
     }
-    // Always destroy/recreate energy doughnut after duration/transient sync (anti-freeze)
-    try { ensureEnergyChartFresh(); } catch (eErr) { console.warn("energy chart recreate", eErr); }
-    applyEnergyDoughnut(bowlEnergyPhase || "end", { recreate: false });
+    // Always destroy/recreate energy chart after duration/transient sync (anti-freeze)
+    applyEnergyDoughnut(bowlEnergyPhase || "end");
     const labels = (s.t_s || []).slice().map((v) => Number(v).toFixed(v >= 60 ? 0 : 1));
     // KPI strip always when series present
     if ((s.T_piezo_c || []).length || sum.dT_piezo_c != null) {
@@ -1194,10 +1223,9 @@
         k_kt_drop_per_c: parseFloat(($("bowlKKtDrop") || { value: 0.0006 }).value),
         derate_smooth: !!($("bowlDerateSmooth") && $("bowlDerateSmooth").checked),
       }, signal);
-      bowlEnergyCache.start = en.energy_start || null;
-      bowlEnergyCache.end = en.energy_end || en.energy_start || null;
-      ensureEnergyChartFresh();
-      applyEnergyDoughnut(bowlEnergyPhase || "end", { recreate: false });
+      bowlEnergyCache.start = cloneEnergyParts(en.energy_start);
+      bowlEnergyCache.end = cloneEnergyParts(en.energy_end || en.energy_start);
+      applyEnergyDoughnut(bowlEnergyPhase || "end");
       if (btn) btn.title = t("bowl.btn_energy_refresh_title");
     } catch (err) {
       if (err && err.name === "AbortError") return;
@@ -1234,6 +1262,47 @@
     const hint = $("bowlGlueSpreadHint");
     if (hint && updateHint !== false) {
       const i18nKey = "bowl.glue_spread_hint_" + k;
+      hint.setAttribute("data-i18n", i18nKey);
+      hint.textContent = t(i18nKey);
+    }
+  }
+
+  function setGluePress(key, updateHint) {
+    const k = key || "medium";
+    if ($("bowlGluePress")) $("bowlGluePress").value = k;
+    document.querySelectorAll("#bowlGluePressChips .preset-chip").forEach((b) => {
+      b.classList.toggle("active", b.dataset.gluePress === k);
+    });
+    const hint = $("bowlGluePressHint");
+    if (hint && updateHint !== false) {
+      const i18nKey = "bowl.glue_press_hint_" + k;
+      hint.setAttribute("data-i18n", i18nKey);
+      hint.textContent = t(i18nKey);
+    }
+  }
+
+  function setGlueCure(pctOrKey, updateHint) {
+    let pct = 100;
+    if (typeof pctOrKey === "string") {
+      const named = { cured: 100, partial: 55, uncured: 15 };
+      pct = named[pctOrKey] != null ? named[pctOrKey] : parseFloat(pctOrKey);
+    } else {
+      pct = Number(pctOrKey);
+    }
+    if (!isFinite(pct)) pct = 100;
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    if ($("bowlGlueCure")) $("bowlGlueCure").value = String(pct);
+    const out = $("bowlGlueCureOut");
+    if (out) out.textContent = pct + " %";
+    let chip = "cured";
+    if (pct <= 30) chip = "uncured";
+    else if (pct <= 70) chip = "partial";
+    document.querySelectorAll("#bowlGlueCureChips .preset-chip").forEach((b) => {
+      b.classList.toggle("active", b.dataset.glueCure === chip);
+    });
+    const hint = $("bowlGlueCureHint");
+    if (hint && updateHint !== false) {
+      const i18nKey = "bowl.glue_cure_hint_" + chip;
       hint.setAttribute("data-i18n", i18nKey);
       hint.textContent = t(i18nKey);
     }
@@ -1461,11 +1530,22 @@
       // No auto-analyze — user presses Analysieren or Energie neu berechnen
     });
   });
+  document.querySelectorAll("#bowlGluePressChips .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => setGluePress(b.dataset.gluePress, true));
+  });
+  document.querySelectorAll("#bowlGlueCureChips .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => setGlueCure(b.dataset.glueCure, true));
+  });
   if ($("bowlGlueCoverage")) {
     $("bowlGlueCoverage").addEventListener("input", syncGlueCoverageOut);
     syncGlueCoverageOut();
   }
+  if ($("bowlGlueCure")) {
+    $("bowlGlueCure").addEventListener("input", () => setGlueCure($("bowlGlueCure").value, true));
+  }
   setGlueSpreadScenario((($("bowlGlueSpreadScenario") || {}).value) || "ideal", true);
+  setGluePress((($("bowlGluePress") || {}).value) || "medium", true);
+  setGlueCure((($("bowlGlueCure") || {}).value) || 100, true);
   $("btnBowlReset").addEventListener("click", resetBowl);
   if ($("bowlDurationPreset")) {
     $("bowlDurationPreset").addEventListener("change", syncBowlDurationUI);
@@ -1596,7 +1676,154 @@
     }).join("");
   }
 
-  function openChartModal(canvasId, infoKey) {
+  let modalWideAbort = null;
+
+  /** Wider axis / denser points for fullscreen only — does not mutate main charts. */
+  async function fetchWideChartConfig(canvasId) {
+    const spanUi = parseFloat(($("bowlSpan") || { value: 0.15 }).value) || 0.15;
+    if (canvasId === "chartBowlSpectrum" || canvasId === "chartBowlPhase") {
+      const span = Math.min(0.85, Math.max(0.45, spanUi * 3));
+      const spec = await getJSON("/api/bowl/spectrum?n=241&span=" + span);
+      const labels = (spec.f_hz || []).map((v) => (v / 1e6).toFixed(2));
+      if (canvasId === "chartBowlSpectrum") {
+        const z = spec.z_in_mag || [];
+        const zMax = Math.max(...z, 1e-9);
+        return {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: t("bowl.legend_t") || "|T|", data: freshArray(spec.t_intensity), borderColor: "#3b9eff", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+              { label: t("bowl.legend_r") || "|R|", data: freshArray(spec.r_intensity), borderColor: "#f07178", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+              { label: t("bowl.legend_z") || "|Z|n", data: z.map((v) => v / zMax), borderColor: "#ffd866", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, yAxisID: "y1" },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: false,
+            scales: {
+              x: { title: { display: true, text: "f (MHz)" } },
+              y: { title: { display: true, text: "T / R" } },
+              y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "|Z| norm" } },
+            },
+          },
+        };
+      }
+      return {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: "∠Z", data: freshArray(spec.z_in_phase_rad), borderColor: "#3b9eff", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+            { label: "∠T", data: freshArray(spec.t_phase_rad), borderColor: "#f07178", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: { x: { title: { display: true, text: "f (MHz)" } }, y: { title: { display: true, text: "phase (rad)" } } },
+        },
+      };
+    }
+    if (canvasId === "chartBowlGlue") {
+      const glue = await postJSON("/api/bowl/sweep", { kind: "glue", h_min_m: 5e-7, h_max_m: 8e-5, n: 64 });
+      return {
+        type: "line",
+        data: {
+          labels: (glue.glue_thickness_um || []).map((v) => Number(v).toFixed(1)),
+          datasets: [
+            { label: t("bowl.p_ac_axis") || "P_ac", data: freshArray(glue.p_ac_w), borderColor: "#2dd4a8", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+            { label: t("bowl.eff_axis") || "η", data: freshArray(glue.efficiency), borderColor: "#c084fc", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, yAxisID: "y1" },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            x: { title: { display: true, text: t("bowl.glue_um") || "glue (µm)" } },
+            y: { title: { display: true, text: "P_ac (W)" } },
+            y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η" } },
+          },
+        },
+      };
+    }
+    if (canvasId === "chartBowlTi") {
+      const ti = await postJSON("/api/bowl/sweep", { kind: "titanium", h_min_m: 3e-5, h_max_m: 3.5e-3, n: 120 });
+      return {
+        type: "line",
+        data: {
+          labels: (ti.ti_thickness_mm || []).map((v) => Number(v).toFixed(2)),
+          datasets: [
+            { label: "T(f0)", data: freshArray(ti.t_at_f0), borderColor: "#3b9eff", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+            { label: "Δf", data: (ti.resonance_shift_hz || []).map((v) => v / 1e6), borderColor: "#ffd866", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, yAxisID: "y1" },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            x: { title: { display: true, text: t("bowl.ti_mm") || "Ti (mm)" } },
+            y: { title: { display: true, text: "T" } },
+            y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "Δf (MHz)" } },
+          },
+        },
+      };
+    }
+    if (canvasId === "chartBowlField") {
+      const field = await getJSON("/api/bowl/field?nx=80&nr=24&z_max_m=0.025");
+      return {
+        type: "line",
+        data: {
+          labels: (field.z_mm || []).map((v) => Number(v).toFixed(2)),
+          datasets: [{ label: "I(z,0)", data: freshArray((field.i_w_cm2 || [])[0] || []), borderColor: "#3b9eff", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { title: { display: true, text: "z (mm)" } }, y: { title: { display: true, text: "I (W/cm²)" } } },
+        },
+      };
+    }
+    if (canvasId === "chartBowlDia") {
+      const dMax = (parseFloat(($("bowlTiD") || { value: 19.54 }).value) || 19.54) * 1e-3;
+      const dia = await postJSON("/api/bowl/sweep", { kind: "piezo_diameter", h_min_m: 0.008, h_max_m: dMax, n: 40 });
+      return {
+        type: "line",
+        data: {
+          labels: (dia.piezo_diameter_mm || []).map((v) => Number(v).toFixed(1)),
+          datasets: [
+            { label: "P_ac", data: freshArray(dia.p_ac_w), borderColor: "#2dd4a8", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0 },
+            { label: "I", data: freshArray(dia.i_sata_w_cm2), borderColor: "#ffd866", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, yAxisID: "y1" },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            x: { title: { display: true, text: "Ø (mm)" } },
+            y: { title: { display: true, text: "P_ac (W)" } },
+            y1: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "I (W/cm²)" } },
+          },
+        },
+      };
+    }
+    if (canvasId === "chartBowlEnergy") {
+      const src = bowlEnergyCache[bowlEnergyPhase] || bowlEnergyCache.end || bowlEnergyCache.start;
+      const parts = src ? energyParts(src) : [0.25, 0.25, 0.25, 0.25];
+      const allZero = parts.every((v) => v <= 0);
+      const data = allZero ? [0.0001, 0, 0, 0] : freshArray(parts);
+      return {
+        type: "bar",
+        data: {
+          labels: energyChartLabels(),
+          datasets: [{ label: "W", data, backgroundColor: ["#2dd4a8", "#c45c26", "#e6a817", "#8a9ba8"], borderWidth: 1, borderColor: "#151d2c", borderRadius: 4 }],
+        },
+        options: {
+          indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, title: { display: true, text: "W" } }, y: { grid: { display: false } } },
+        },
+      };
+    }
+    return null;
+  }
+
+  async function openChartModal(canvasId, infoKey) {
     if (String(canvasId || "").indexOf("Bowl") >= 0) {
       try { ensureBowl(); } catch (_) { /* ignore */ }
     }
@@ -1608,15 +1835,44 @@
     $("chartModalTitle").textContent = resolveChartTitle(canvasId, infoKey);
     const capKey = CHART_CAPTION_KEY[canvasId];
     const cap = capKey ? t(capKey) : "";
-    $("chartModalCaption").textContent = (cap && cap !== capKey) ? cap : "";
+    const wideNote = t("bowl.expand_wide_note");
+    $("chartModalCaption").textContent = ((cap && cap !== capKey) ? cap : "") + ((wideNote && wideNote !== "bowl.expand_wide_note") ? (" · " + wideNote) : "");
     $("chartModalInfo").innerHTML = formatInfoHtml(t(infoKey || ""));
 
     if (modalChart) {
       try { modalChart.destroy(); } catch (_) { /* ignore */ }
       modalChart = null;
     }
-    const cfg = cloneChartConfig(src);
+    if (modalWideAbort) {
+      try { modalWideAbort.abort(); } catch (_) { /* ignore */ }
+    }
+    modalWideAbort = new AbortController();
+
+    modal.classList.remove("hidden");
+    modal.removeAttribute("hidden");
+    document.body.style.overflow = "hidden";
+
+    let cfg = null;
+    const wideIds = {
+      chartBowlSpectrum: 1, chartBowlPhase: 1, chartBowlGlue: 1, chartBowlTi: 1,
+      chartBowlField: 1, chartBowlDia: 1, chartBowlEnergy: 1,
+    };
+    if (wideIds[canvasId]) {
+      try {
+        // Ensure server has current params before wide fetch
+        await postJSON("/api/bowl/params", bowlPayload(), modalWideAbort.signal);
+        cfg = await fetchWideChartConfig(canvasId);
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
+        console.warn("wide fetch", canvasId, err);
+      }
+    }
+    if (!cfg) cfg = cloneChartConfig(src);
     if (cfg) {
+      try {
+        const existing = (typeof Chart.getChart === "function") ? Chart.getChart(canvas) : null;
+        if (existing) existing.destroy();
+      } catch (_) { /* ignore */ }
       modalChart = new Chart(canvas, cfg);
     } else {
       modalChart = new Chart(canvas, {
@@ -1625,9 +1881,6 @@
         options: { responsive: true, maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } } },
       });
     }
-    modal.classList.remove("hidden");
-    modal.removeAttribute("hidden");
-    document.body.style.overflow = "hidden";
     requestAnimationFrame(() => {
       try { if (modalChart) { modalChart.resize(); modalChart.update("none"); } } catch (_) { /* ignore */ }
     });
@@ -1684,5 +1937,7 @@
   if (localStorage.getItem(LANG_KEY) && localStorage.getItem(LANG_KEY) !== window.__LANG__) setLang(localStorage.getItem(LANG_KEY));
   else applyI18n();
   updateCollapseLabels(isSettingsCollapsed());
+  // Default landing tab: Akustik-Schale (not therapy)
+  switchTab("bowl");
   loadPrograms().then(refresh);
 })();

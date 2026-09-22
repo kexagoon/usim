@@ -36,12 +36,14 @@ def test_energy_destroy_recreate_helpers_in_js():
     assert "function refreshBowlEnergyOnly" in src
     assert 'postJSON("/api/bowl/energy"' in src
     assert "ensureEnergyChartFresh" in src
-    # transient path hardens energy chart
+    # transient path hardens energy chart (applyEnergyDoughnut always destroy+recreates)
     start = src.find("function renderBowlTransient")
     end = src.find("async function refreshBowlTempsOnly", start)
     body = src[start:end]
-    assert "ensureEnergyChartFresh" in body
     assert "applyEnergyDoughnut" in body
+    assert "cloneEnergyParts" in body or "applyEnergyDoughnut" in body
+    assert "function ensureEnergyChartFresh" in src
+    assert 'type: "bar"' in src  # energy uses bar for freeze reliability
 
 
 def test_glue_spread_scenarios_resolve():
@@ -118,6 +120,8 @@ def test_i18n_energy_glue_keys():
             "glue_spread_bias_ti",
             "glue_spread_islands",
             "help_glue_spread",
+            "glue_press",
+            "glue_cure",
         ):
             assert key in bowl and isinstance(bowl[key], str) and bowl[key].strip()
         assert "glue_spread" in bowl["info_energy"] or "resolve_glue_spread" in bowl["info_energy"]

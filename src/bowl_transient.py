@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from src.acoustic_bowl import AcousticBowl, _load_bowl_yaml, resolve_glue_spread
+from src.acoustic_bowl import AcousticBowl, _load_bowl_yaml, bond_factors_from_params, resolve_glue_spread
 
 
 DURATION_MAX_S = 720.0  # 12 min
@@ -131,10 +131,7 @@ def _heat_capacities(bowl: AcousticBowl, th: ThermalParams) -> dict[str, float]:
     h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
     a_pzt = math.pi * (min(p.piezo_diameter_m, p.cup_inner_diameter_m) / 2.0) ** 2
     a_ti = math.pi * (p.ti_diameter_m / 2.0) ** 2
-    gs = resolve_glue_spread(
-        getattr(p, "glue_spread_scenario", "ideal"),
-        getattr(p, "glue_coverage", 1.0),
-    )
+    gs = bond_factors_from_params(p)
     a_glue = a_pzt * gs.coverage
     # Cup outer surface for convection (bottom + approximate side wall)
     wall_area = math.pi * p.cup_outer_diameter_m * max(p.cup_depth_m, 1e-3)
@@ -226,10 +223,7 @@ def run_bowl_transient(
     c_p, c_g, c_ti, c_ld = caps["piezo"], caps["glue"], caps["ti"], caps["load"]
     a_p, a_ti = caps["area_piezo"], caps["area_ti"]
     a_cool = caps.get("area_cool", a_ti)
-    gs_th = resolve_glue_spread(
-        getattr(bowl.params, "glue_spread_scenario", "ideal"),
-        getattr(bowl.params, "glue_coverage", 1.0),
-    )
+    gs_th = bond_factors_from_params(bowl.params)
     g_pg = th.g_piezo_glue_w_k * gs_th.g_pg_mul
     g_gt = th.g_glue_ti_w_k * gs_th.g_gt_mul
     g_tl = th.g_ti_load_w_k if th.include_load_node else 0.0
@@ -392,6 +386,8 @@ def run_bowl_transient(
             "g_pg_mul": gs_th.g_pg_mul,
             "g_gt_mul": gs_th.g_gt_mul,
             "vol_mul": gs_th.vol_mul,
+            "press": gs_th.press,
+            "cure_fraction": gs_th.cure_fraction,
             "g_piezo_glue_eff_w_k": g_pg,
             "g_glue_ti_eff_w_k": g_gt,
         },

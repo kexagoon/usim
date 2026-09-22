@@ -14,8 +14,8 @@
       <span class="badge calib" data-i18n="app.calibration_badge">{{ i18n.app.calibration_badge }}</span>
     </div>
     <nav class="main-tabs" role="tablist">
-      <button type="button" class="tab-btn active" data-tab="therapy" data-i18n="nav.therapy">Therapie</button>
-      <button type="button" class="tab-btn" data-tab="bowl" data-i18n="nav.bowl">Akustik-Schale</button>
+      <button type="button" class="tab-btn" data-tab="therapy" data-i18n="nav.therapy">Therapie</button>
+      <button type="button" class="tab-btn active" data-tab="bowl" data-i18n="nav.bowl">Akustik-Schale</button>
     </nav>
     <div class="controls" id="therapyControls">
       <div class="lang">
@@ -53,7 +53,7 @@
   <p class="disclaimer" data-i18n="app.disclaimer">{{ i18n.app.disclaimer }}</p>
 
   <!-- ===================== THERAPY TAB ===================== -->
-  <main class="therapy-layout" id="tab-therapy" data-tab-panel="therapy">
+  <main class="therapy-layout hidden" id="tab-therapy" data-tab-panel="therapy">
     <button type="button" id="btnSettingsReopenTherapy" class="settings-reopen" hidden
             aria-label="Einstellungen einblenden" data-i18n-title="header.settings_show" title="">
       <span aria-hidden="true">»</span>
@@ -454,7 +454,7 @@
   </main>
 
   <!-- ===================== BOWL TAB ===================== -->
-  <main class="bowl-layout hidden" id="tab-bowl" data-tab-panel="bowl">
+  <main class="bowl-layout" id="tab-bowl" data-tab-panel="bowl">
     <div class="bowl-header">
       <h1>
         <span data-i18n="bowl.title">Akustik-Schale</span>
@@ -613,6 +613,36 @@
                 </label>
                 <p class="help glue-spread-help" data-i18n="bowl.help_glue_spread"></p>
                 <p class="hint muted glue-spread-hint" id="bowlGlueSpreadHint" data-i18n="bowl.glue_spread_hint_ideal"></p>
+
+                <div class="label-row glue-spread-head" style="margin-top:0.75rem">
+                  <span data-i18n="bowl.glue_press">Anpressdruck beim Kleben</span>
+                  <span class="info" data-i18n-title="bowl.help_glue_press" title="">?</span>
+                </div>
+                <div class="preset-chips glue-spread-chips" id="bowlGluePressChips" role="group" aria-label="Glue bonding press">
+                  <button type="button" class="preset-chip" data-glue-press="strong" data-i18n="bowl.glue_press_strong">Stark</button>
+                  <button type="button" class="preset-chip active" data-glue-press="medium" data-i18n="bowl.glue_press_medium">Mittel</button>
+                  <button type="button" class="preset-chip" data-glue-press="weak" data-i18n="bowl.glue_press_weak">Schwach</button>
+                </div>
+                <input type="hidden" id="bowlGluePress" value="medium" />
+                <p class="hint muted" id="bowlGluePressHint" data-i18n="bowl.glue_press_hint_medium"></p>
+
+                <div class="label-row glue-spread-head" style="margin-top:0.75rem">
+                  <span data-i18n="bowl.glue_cure">Aushärtung / Trocknung</span>
+                  <span class="info" data-i18n-title="bowl.help_glue_cure" title="">?</span>
+                </div>
+                <div class="preset-chips glue-spread-chips" id="bowlGlueCureChips" role="group" aria-label="Glue cure degree">
+                  <button type="button" class="preset-chip active" data-glue-cure="cured" data-i18n="bowl.glue_cure_cured">Voll ausgehärtet</button>
+                  <button type="button" class="preset-chip" data-glue-cure="partial" data-i18n="bowl.glue_cure_partial">Teilweise</button>
+                  <button type="button" class="preset-chip" data-glue-cure="uncured" data-i18n="bowl.glue_cure_uncured">Unausgehärtet</button>
+                </div>
+                <label class="glue-coverage-label"><span class="label-row"><span data-i18n="bowl.glue_cure_pct">Aushärtungsgrad (%)</span>
+                  <span class="info" data-i18n-title="bowl.help_glue_cure" title="">?</span></span>
+                  <div class="glue-coverage-row">
+                    <input type="range" id="bowlGlueCure" min="0" max="100" step="5" value="100" />
+                    <output id="bowlGlueCureOut" for="bowlGlueCure">100 %</output>
+                  </div>
+                </label>
+                <p class="hint muted" id="bowlGlueCureHint" data-i18n="bowl.glue_cure_hint_cured"></p>
               </div>
               <label><span class="label-row"><span data-i18n="bowl.gel_h">Gel (mm)</span>
                 <span class="info" data-i18n-title="bowl.help_gel" title="">?</span></span>
@@ -854,7 +884,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.spectrum">Spectrum</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlSpectrum" data-info-key="bowl.info_spectrum" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlSpectrum" data-expand-wide="1" data-info-key="bowl.info_spectrum" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlSpectrum" data-info-key="bowl.info_spectrum" title="Info" aria-label="Info">
@@ -869,7 +899,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.sweep_glue">Glue sweep</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlGlue" data-info-key="bowl.info_glue" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlGlue" data-expand-wide="1" data-info-key="bowl.info_glue" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlGlue" data-info-key="bowl.info_glue" title="Info" aria-label="Info">
@@ -884,7 +914,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.sweep_ti">Ti sweep</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlTi" data-info-key="bowl.info_ti" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlTi" data-expand-wide="1" data-info-key="bowl.info_ti" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlTi" data-info-key="bowl.info_ti" title="Info" aria-label="Info">
@@ -902,7 +932,7 @@
                 <button type="button" class="chart-tool-btn chart-tool-btn-text" id="btnBowlEnergyRefresh" data-i18n-title="bowl.btn_energy_refresh_title" title="Energie neu berechnen" aria-label="Energie neu berechnen">
                   <span aria-hidden="true">↺</span><span data-energy-label data-i18n="bowl.btn_energy_refresh">Energie neu berechnen</span>
                 </button>
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlEnergy" data-info-key="bowl.info_energy" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlEnergy" data-expand-wide="1" data-info-key="bowl.info_energy" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlEnergy" data-info-key="bowl.info_energy" title="Info" aria-label="Info">
@@ -925,7 +955,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.field">Near-field</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlField" data-info-key="bowl.info_field" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlField" data-expand-wide="1" data-info-key="bowl.info_field" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlField" data-info-key="bowl.info_field" title="Info" aria-label="Info">
@@ -940,7 +970,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.sweep_dia">Piezo-Durchmesser</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlDia" data-info-key="bowl.info_dia" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlDia" data-expand-wide="1" data-info-key="bowl.info_dia" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlDia" data-info-key="bowl.info_dia" title="Info" aria-label="Info">
@@ -985,7 +1015,7 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.phase">Phase Z_in / T</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlPhase" data-info-key="bowl.info_phase" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlPhase" data-expand-wide="1" data-info-key="bowl.info_phase" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
                 <button type="button" class="chart-tool-btn" data-chart-info="chartBowlPhase" data-info-key="bowl.info_phase" title="Info" aria-label="Info">
