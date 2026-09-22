@@ -16,6 +16,8 @@
   let bowlAbort = null;
   let bowlTempsBusy = false;
   let bowlTempsAbort = null;
+  let bowlEnergyBusy = false;
+  let bowlEnergyAbort = null;
 
   function $(id) { return document.getElementById(id); }
   function t(key) {
@@ -145,6 +147,53 @@
 
   function ensureTempsChartFresh() {
     return recreateLineChart("chartBowlTemps", "temps", (el) => buildTempsChart(el));
+  }
+
+  function buildEnergyChart(canvasEl) {
+    const el = canvasEl || $("chartBowlEnergy");
+    if (!el) return null;
+    return new Chart(el, {
+      type: "doughnut",
+      data: {
+        labels: [
+          t("bowl.p_rad") || "P_ac",
+          t("bowl.p_glue") || "glue",
+          t("bowl.p_piezo") || "piezo",
+          t("bowl.p_ti") || "Ti",
+        ],
+        datasets: [{
+          data: [0.25, 0.25, 0.25, 0.25],
+          backgroundColor: ["#2dd4a8", "#c45c26", "#e6a817", "#8a9ba8"],
+          borderWidth: 2,
+          borderColor: "#151d2c",
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        animations: false,
+        transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
+        plugins: {
+          legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const v = Number(ctx.raw) || 0;
+                const sum = (ctx.dataset.data || []).reduce((a, b) => a + (Number(b) || 0), 0) || 1;
+                const pct = (100 * v / sum).toFixed(1);
+                return `${ctx.label}: ${v.toFixed(4)} W (${pct} %)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function ensureEnergyChartFresh() {
+    return recreateLineChart("chartBowlEnergy", "energy", (el) => buildEnergyChart(el));
   }
 
   function initTherapyCharts() {
@@ -462,6 +511,8 @@
       k_eff_drop_per_c: parseFloat(($("bowlKEffDrop") || { value: 0.0018 }).value),
       k_kt_drop_per_c: parseFloat(($("bowlKKtDrop") || { value: 0.0006 }).value),
       derate_smooth: !!($("bowlDerateSmooth") && $("bowlDerateSmooth").checked),
+      glue_spread_scenario: (($("bowlGlueSpreadScenario") || { value: "ideal" }).value || "ideal"),
+      glue_coverage: Math.max(0.2, Math.min(1, (parseFloat(($("bowlGlueCoverage") || { value: 100 }).value) || 100) / 100)),
       duration_s: bowlDurationSeconds(),
       dt_s: parseFloat(($("bowlDtS") || { value: 0.15 }).value),
     };
@@ -538,6 +589,12 @@
     $("bowlPiezoD").value = ((p.piezo_diameter_m || 0.018) * 1e3).toFixed(1);
     clampPiezoDiameter(false);
     $("bowlGlueH").value = ((p.glue_thickness_m || 1e-5) * 1e6).toFixed(0);
+    if (p.glue_spread_scenario) setGlueSpreadScenario(p.glue_spread_scenario, false);
+    if (p.glue_coverage != null && $("bowlGlueCoverage")) {
+      const pct = Math.round(Number(p.glue_coverage) * 100);
+      $("bowlGlueCoverage").value = String(Math.max(20, Math.min(100, pct)));
+      syncGlueCoverageOut();
+    }
     $("bowlGelH").value = ((p.gel_thickness_m || 3e-4) * 1e3).toFixed(2);
     if ($("bowlMatchEn")) $("bowlMatchEn").checked = !!p.matching_enabled;
     if ($("bowlMatchMat") && p.matching_material) $("bowlMatchMat").value = p.matching_material;
@@ -591,37 +648,7 @@
       bowlCharts.ti.options.scales.x.title.text = "Ti (mm)";
     }
     if ($("chartBowlEnergy")) {
-      bowlCharts.energy = new Chart($("chartBowlEnergy"), {
-      type: "doughnut",
-      data: {
-        labels: ["P_ac", "glue", "piezo", "Ti"],
-        datasets: [{
-          data: [0.25, 0.25, 0.25, 0.25],
-          backgroundColor: ["#2dd4a8", "#c45c26", "#e6a817", "#8a9ba8"],
-          borderWidth: 2,
-          borderColor: "#151d2c",
-          hoverOffset: 6,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 0 },
-        plugins: {
-          legend: { position: "right", labels: { boxWidth: 12, font: { size: 11 } } },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const v = Number(ctx.raw) || 0;
-                const sum = (ctx.dataset.data || []).reduce((a, b) => a + (Number(b) || 0), 0) || 1;
-                const pct = (100 * v / sum).toFixed(1);
-                return `${ctx.label}: ${v.toFixed(4)} W (${pct} %)`;
-              },
-            },
-          },
-        },
-      },
-    });
+      bowlCharts.energy = buildEnergyChart($("chartBowlEnergy"));
     }
     bowlCharts.field = lineChart("chartBowlField", "I(z,0)", "#3b9eff");
     if (bowlCharts.field) {
@@ -840,10 +867,11 @@
     box.innerHTML = rows + `<div class="ed-total">${t("bowl.energy_total")}: ${sum.toFixed(4)} W</div>`;
   }
 
-  function applyEnergyDoughnut(phase) {
+  function applyEnergyDoughnut(phase, opts) {
     try {
       if (!bowlEnergyCache) bowlEnergyCache = { start: null, end: null };
       if (phase) bowlEnergyPhase = phase;
+      const recreate = !(opts && opts.recreate === false);
       const src = bowlEnergyCache[bowlEnergyPhase] || bowlEnergyCache.end || bowlEnergyCache.start;
       if (!src) {
         renderEnergyDetail([0, 0, 0, 0]);
@@ -852,11 +880,16 @@
       const parts = energyParts(src);
       // Chart.js hides an all-zero doughnut — keep a tiny placeholder only for empty state
       const allZero = parts.every((v) => v <= 0);
-      const data = allZero ? [0.0001, 0, 0, 0] : parts;
-      if (bowlCharts.energy) {
-        bowlCharts.energy.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
-        bowlCharts.energy.data.datasets[0].data = data;
-        bumpChart(bowlCharts.energy);
+      const data = allZero ? [0.0001, 0, 0, 0] : freshArray(parts);
+      let ch = bowlCharts.energy;
+      if (recreate || !ch) {
+        ch = ensureEnergyChartFresh();
+      }
+      if (ch) {
+        ch.data.labels = [t("bowl.p_rad"), t("bowl.p_glue"), t("bowl.p_piezo"), t("bowl.p_ti")];
+        ch.data.datasets[0].data = data.slice();
+        if (typeof ch.resize === "function") ch.resize();
+        bumpChart(ch);
       }
       renderEnergyDetail(allZero ? [0, 0, 0, 0] : parts);
       document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
@@ -1023,7 +1056,9 @@
         efficiency: (s.eta || [])[n] || 0,
       };
     }
-    applyEnergyDoughnut(bowlEnergyPhase || "end");
+    // Always destroy/recreate energy doughnut after duration/transient sync (anti-freeze)
+    try { ensureEnergyChartFresh(); } catch (eErr) { console.warn("energy chart recreate", eErr); }
+    applyEnergyDoughnut(bowlEnergyPhase || "end", { recreate: false });
     const labels = (s.t_s || []).slice().map((v) => Number(v).toFixed(v >= 60 ? 0 : 1));
     // KPI strip always when series present
     if ((s.T_piezo_c || []).length || sum.dT_piezo_c != null) {
@@ -1120,6 +1155,87 @@
           span.textContent = labelIdle;
         } else btn.textContent = labelIdle;
       }
+    }
+  }
+
+  async function refreshBowlEnergyOnly() {
+    if (bowlEnergyBusy) return;
+    bowlEnergyBusy = true;
+    const btn = $("btnBowlEnergyRefresh");
+    const labelBusy = t("bowl.btn_energy_refresh_busy");
+    const labelIdle = t("bowl.btn_energy_refresh");
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-busy");
+      const span = btn.querySelector("[data-energy-label]");
+      if (span) span.textContent = labelBusy;
+      else btn.textContent = labelBusy;
+    }
+    if (bowlEnergyAbort) {
+      try { bowlEnergyAbort.abort(); } catch (_) { /* ignore */ }
+    }
+    bowlEnergyAbort = new AbortController();
+    const signal = bowlEnergyAbort.signal;
+    try {
+      ensureBowl();
+      await postJSON("/api/bowl/params", bowlPayload(), signal);
+      const en = await postJSON("/api/bowl/energy", {
+        duration_s: bowlDurationSeconds(),
+        dt_s: parseFloat(($("bowlDtS") || { value: 0.15 }).value),
+        include_heated: true,
+        t_amb_c: parseFloat(($("bowlTAmb") || { value: 25 }).value),
+        t_warn_c: parseFloat(($("bowlTWarn") || { value: 55 }).value),
+        t_off_c: parseFloat(($("bowlTOff") || { value: 70 }).value),
+        h_conv_w_m2k: parseFloat(($("bowlHConv") || { value: 40 }).value),
+        g_piezo_glue_w_k: parseFloat(($("bowlGPG") || { value: 0.35 }).value),
+        g_glue_ti_w_k: parseFloat(($("bowlGGT") || { value: 0.50 }).value),
+        k_glue_loss_per_c: parseFloat(($("bowlKGlueLoss") || { value: 0.025 }).value),
+        k_eff_drop_per_c: parseFloat(($("bowlKEffDrop") || { value: 0.0018 }).value),
+        k_kt_drop_per_c: parseFloat(($("bowlKKtDrop") || { value: 0.0006 }).value),
+        derate_smooth: !!($("bowlDerateSmooth") && $("bowlDerateSmooth").checked),
+      }, signal);
+      bowlEnergyCache.start = en.energy_start || null;
+      bowlEnergyCache.end = en.energy_end || en.energy_start || null;
+      ensureEnergyChartFresh();
+      applyEnergyDoughnut(bowlEnergyPhase || "end", { recreate: false });
+      if (btn) btn.title = t("bowl.btn_energy_refresh_title");
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      console.warn("refreshBowlEnergyOnly", err);
+      const hint = String((err && err.message) || err || "energy refresh failed");
+      if (btn) btn.title = hint;
+    } finally {
+      bowlEnergyBusy = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+        const span = btn.querySelector("[data-energy-label]");
+        if (span) {
+          span.setAttribute("data-i18n", "bowl.btn_energy_refresh");
+          span.textContent = labelIdle;
+        } else btn.textContent = labelIdle;
+      }
+    }
+  }
+
+  function syncGlueCoverageOut() {
+    const el = $("bowlGlueCoverage");
+    const out = $("bowlGlueCoverageOut");
+    if (!el || !out) return;
+    out.textContent = String(el.value) + " %";
+  }
+
+  function setGlueSpreadScenario(key, updateHint) {
+    const k = key || "ideal";
+    if ($("bowlGlueSpreadScenario")) $("bowlGlueSpreadScenario").value = k;
+    document.querySelectorAll("#bowlGlueSpread .preset-chip").forEach((b) => {
+      b.classList.toggle("active", b.dataset.glueSpread === k);
+    });
+    const hint = $("bowlGlueSpreadHint");
+    if (hint && updateHint !== false) {
+      const i18nKey = "bowl.glue_spread_hint_" + k;
+      hint.setAttribute("data-i18n", i18nKey);
+      hint.textContent = t(i18nKey);
     }
   }
 
@@ -1334,10 +1450,22 @@
   if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("change", () => clampPiezoDiameter(true));
   $("btnBowlAnalyze").addEventListener("click", analyzeBowl);
   if ($("btnBowlTempsRefresh")) $("btnBowlTempsRefresh").addEventListener("click", refreshBowlTempsOnly);
+  if ($("btnBowlEnergyRefresh")) $("btnBowlEnergyRefresh").addEventListener("click", refreshBowlEnergyOnly);
 
   document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
     b.addEventListener("click", () => applyEnergyDoughnut(b.dataset.phase));
   });
+  document.querySelectorAll("#bowlGlueSpread .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => {
+      setGlueSpreadScenario(b.dataset.glueSpread, true);
+      // No auto-analyze — user presses Analysieren or Energie neu berechnen
+    });
+  });
+  if ($("bowlGlueCoverage")) {
+    $("bowlGlueCoverage").addEventListener("input", syncGlueCoverageOut);
+    syncGlueCoverageOut();
+  }
+  setGlueSpreadScenario((($("bowlGlueSpreadScenario") || {}).value) || "ideal", true);
   $("btnBowlReset").addEventListener("click", resetBowl);
   if ($("bowlDurationPreset")) {
     $("bowlDurationPreset").addEventListener("change", syncBowlDurationUI);

@@ -130,6 +130,11 @@ class BowlParams:
     load_z_mrayl: float | None = None
     # Transient / calib: scales glue attenuation (1 = nominal)
     glue_attn_scale: float = 1.0
+    # Glue spread between piezo ↔ titanium (calibration scenarios)
+    # ideal | thin_wet | thick_fillet | bias_piezo | bias_ti | islands
+    glue_spread_scenario: str = "ideal"
+    # Contact / coverage fraction 0.2…1.0 (used strongly by islands / thin_wet)
+    glue_coverage: float = 1.0
 
     def resolved_piezo_thickness(self, c_pzt: float) -> float:
         if self.piezo_thickness_m is not None and self.piezo_thickness_m > 0:
@@ -316,6 +321,22 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
         "d_eq_mm": era_equivalent_diameter_m() * 1e3,
         "loads": ["air", "water", "gel", "soft_tissue", "fat", "bone", "gel_tissue"],
         "backing_options": ["air", "heavy"],
+        "glue_spread_scenarios": list(GLUE_SPREAD_SCENARIOS),
+        "glue_spread_defaults": {
+            k: {
+                "coverage": resolve_glue_spread(k).coverage,
+                "attn_mul": resolve_glue_spread(k).attn_mul,
+                "mismatch_mul": resolve_glue_spread(k).mismatch_mul,
+                "h_eff_mul": resolve_glue_spread(k).h_eff_mul,
+                "w_glue_mul": resolve_glue_spread(k).w_glue_mul,
+                "w_pzt_mul": resolve_glue_spread(k).w_pzt_mul,
+                "w_ti_mul": resolve_glue_spread(k).w_ti_mul,
+                "g_pg_mul": resolve_glue_spread(k).g_pg_mul,
+                "g_gt_mul": resolve_glue_spread(k).g_gt_mul,
+                "vol_mul": resolve_glue_spread(k).vol_mul,
+            }
+            for k in GLUE_SPREAD_SCENARIOS
+        },
         "geometry_keys": [
             "cup_inner_diameter_m",
             "cup_outer_diameter_m",
@@ -337,6 +358,137 @@ def apply_named_preset(name: str, base: BowlParams | None = None) -> BowlParams:
     if name not in presets:
         raise KeyError(f"Unknown bowl preset '{name}'")
     return bowl_params_from_dict(dict(presets[name]), base or default_bowl_params(cfg))
+
+
+
+GLUE_SPREAD_SCENARIOS = (
+    "ideal",
+    "thin_wet",
+    "thick_fillet",
+    "bias_piezo",
+    "bias_ti",
+    "islands",
+)
+
+
+@dataclass(frozen=True)
+class GlueSpreadFactors:
+    """Resolved multipliers for energy_partition + lumped thermal bond.
+
+    Wired to real model knobs: coverage→area_ratio/contact, attn_mul→α_glue,
+    mismatch_mul→mismatch_extra, h_eff_mul→loss path thickness, w_*→remain
+    weights, g_*_mul→thermal G_pg / G_gt, vol_mul→glue heat capacity volume.
+    """
+
+    key: str
+    coverage: float
+    attn_mul: float
+    mismatch_mul: float
+    h_eff_mul: float
+    w_glue_mul: float
+    w_pzt_mul: float
+    w_ti_mul: float
+    g_pg_mul: float
+    g_gt_mul: float
+    vol_mul: float
+
+
+def resolve_glue_spread(
+    scenario: str | None,
+    coverage: float | None = None,
+) -> GlueSpreadFactors:
+    """Map named glue-spread scenario (+ optional coverage) to physics multipliers."""
+    key = (scenario or "ideal").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "gleichmaessig": "ideal",
+        "gleichmäßig": "ideal",
+        "baseline": "ideal",
+        "duenn": "thin_wet",
+        "dünn": "thin_wet",
+        "thin": "thin_wet",
+        "knapp": "thin_wet",
+        "dick": "thick_fillet",
+        "thick": "thick_fillet",
+        "wulst": "thick_fillet",
+        "fillet": "thick_fillet",
+        "piezo": "bias_piezo",
+        "mehr_piezo": "bias_piezo",
+        "titan": "bias_ti",
+        "ti": "bias_ti",
+        "mehr_ti": "bias_ti",
+        "mehr_titan": "bias_ti",
+        "insel": "islands",
+        "inseln": "islands",
+        "partial": "islands",
+        "irregular": "islands",
+    }
+    key = aliases.get(key, key)
+    if key not in GLUE_SPREAD_SCENARIOS:
+        key = "ideal"
+
+    # Base table — CALIBRATION_PRESET educational factors, not factory bond metrology
+    table: dict[str, dict[str, float]] = {
+        "ideal": dict(
+            coverage=1.0, attn_mul=1.0, mismatch_mul=1.0, h_eff_mul=1.0,
+            w_glue_mul=1.0, w_pzt_mul=1.0, w_ti_mul=1.0,
+            g_pg_mul=1.0, g_gt_mul=1.0, vol_mul=1.0,
+        ),
+        # Incomplete wetting → less contact area, higher mismatch, less glue mass
+        "thin_wet": dict(
+            coverage=0.70, attn_mul=0.90, mismatch_mul=1.45, h_eff_mul=0.85,
+            w_glue_mul=0.85, w_pzt_mul=1.05, w_ti_mul=1.05,
+            g_pg_mul=0.75, g_gt_mul=0.75, vol_mul=0.55,
+        ),
+        # Excess fillet / thick bond → more α·h, glue loss weight, thermal mass
+        "thick_fillet": dict(
+            coverage=1.0, attn_mul=1.55, mismatch_mul=1.35, h_eff_mul=1.45,
+            w_glue_mul=1.50, w_pzt_mul=0.95, w_ti_mul=0.95,
+            g_pg_mul=1.10, g_gt_mul=1.10, vol_mul=1.40,
+        ),
+        # Glue biased toward piezo face → piezo-side loss / G_pg up
+        "bias_piezo": dict(
+            coverage=1.0, attn_mul=1.10, mismatch_mul=1.05, h_eff_mul=1.0,
+            w_glue_mul=0.90, w_pzt_mul=1.40, w_ti_mul=0.70,
+            g_pg_mul=1.45, g_gt_mul=0.70, vol_mul=1.0,
+        ),
+        # Glue biased toward Ti → Ti-path loss / G_gt up
+        "bias_ti": dict(
+            coverage=1.0, attn_mul=1.10, mismatch_mul=1.05, h_eff_mul=1.0,
+            w_glue_mul=0.90, w_pzt_mul=0.75, w_ti_mul=1.85,
+            g_pg_mul=0.70, g_gt_mul=1.50, vol_mul=1.0,
+        ),
+        # Partial area coverage / islands
+        "islands": dict(
+            coverage=0.50, attn_mul=1.15, mismatch_mul=1.55, h_eff_mul=1.0,
+            w_glue_mul=1.15, w_pzt_mul=1.05, w_ti_mul=1.05,
+            g_pg_mul=0.60, g_gt_mul=0.60, vol_mul=0.50,
+        ),
+    }
+    base = dict(table[key])
+    cov_ui = coverage
+    if cov_ui is None:
+        cov = float(base["coverage"])
+    else:
+        cov = float(np.clip(float(cov_ui), 0.2, 1.0))
+        # For ideal/bias scenarios UI coverage still scales contact lightly
+        if key in ("ideal", "bias_piezo", "bias_ti", "thick_fillet"):
+            base["coverage"] = cov
+        else:
+            # Blend scenario default with UI slider (geometric mean keeps both meaningful)
+            base["coverage"] = float(np.clip(math.sqrt(base["coverage"] * cov), 0.2, 1.0))
+    return GlueSpreadFactors(
+        key=key,
+        coverage=float(np.clip(base["coverage"], 0.2, 1.0)),
+        attn_mul=float(base["attn_mul"]),
+        mismatch_mul=float(base["mismatch_mul"]),
+        h_eff_mul=float(base["h_eff_mul"]),
+        w_glue_mul=float(base["w_glue_mul"]),
+        w_pzt_mul=float(base["w_pzt_mul"]),
+        w_ti_mul=float(base["w_ti_mul"]),
+        g_pg_mul=float(base["g_pg_mul"]),
+        g_gt_mul=float(base["g_gt_mul"]),
+        vol_mul=float(base["vol_mul"]),
+    )
 
 
 class AcousticBowl:
@@ -465,6 +617,8 @@ class AcousticBowl:
             "ti_bottom_thickness_m": p.ti_thickness_m,
             "piezo_diameter_m": p.piezo_diameter_m,
             "glue_thickness_m": p.glue_thickness_m,
+            "glue_spread_scenario": getattr(p, "glue_spread_scenario", "ideal"),
+            "glue_coverage": getattr(p, "glue_coverage", 1.0),
             "pcb_drive_v": p.pcb_drive_v,
             "p_elec_max_w": p.p_elec_max_w,
             "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
@@ -653,19 +807,27 @@ class AcousticBowl:
         h_glue = p.glue_thickness_m
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
         h_ti = p.ti_thickness_m
+        gs = resolve_glue_spread(
+            getattr(p, "glue_spread_scenario", "ideal"),
+            getattr(p, "glue_coverage", 1.0),
+        )
         glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
+        glue_scale = max(0.2, min(5.0, glue_scale)) * gs.attn_mul
         glue_scale = max(0.2, min(5.0, glue_scale))
         alpha_glue = mats["glue"].attenuation_np_m_mhz * glue_scale * (f / 1e6)
         alpha_pzt = mats["pzt"].attenuation_np_m_mhz * (f / 1e6)
         alpha_ti = mats["titanium"].attenuation_np_m_mhz * (f / 1e6)
-        loss_glue = 1.0 - math.exp(-4.0 * alpha_glue * h_glue)
+        h_glue_eff = h_glue * gs.h_eff_mul
+        loss_glue = 1.0 - math.exp(-4.0 * alpha_glue * h_glue_eff)
         loss_pzt = 1.0 - math.exp(-4.0 * alpha_pzt * h_pzt)
         loss_ti = 1.0 - math.exp(-4.0 * alpha_ti * h_ti)
         lam_glue = mats["glue"].c_m_s / f
-        mismatch_extra = min(0.85, (h_glue / max(lam_glue, 1e-9)) * 8.0)
+        mismatch_extra = min(0.85, (h_glue_eff / max(lam_glue, 1e-9)) * 8.0 * gs.mismatch_mul)
 
         ref_params = BowlParams(**{f.name: getattr(p, f.name) for f in fields(p)})
         ref_params.glue_thickness_m = 1e-6
+        ref_params.glue_spread_scenario = "ideal"
+        ref_params.glue_coverage = 1.0
         ref_bowl = AcousticBowl(ref_params, self.cfg)
         t_ref, _, _ = ref_bowl.transmission_reflection(f)
         t_ref = max(t_ref, 1e-12)
@@ -675,19 +837,19 @@ class AcousticBowl:
         # Heavy backing absorbs some drive energy (broader BW trade-off)
         if p.backing == "heavy":
             absorbed = min(0.98, absorbed + 0.08)
-        coupling = max(0.0, t_rel * (1.0 - absorbed))
+        coupling = max(0.0, t_rel * (1.0 - absorbed) * gs.coverage)
         coupling = min(1.0, coupling)
 
-        # Area scaling: smaller piezo → less radiated power
+        # Area scaling: smaller piezo → less radiated power; coverage reduces effective ERA share
         area_ratio = (math.pi * (min(p.piezo_diameter_m, p.ti_diameter_m) / 2) ** 2) / ERA_M2
-        area_ratio = float(np.clip(area_ratio, 0.2, 1.2))
+        area_ratio = float(np.clip(area_ratio * gs.coverage, 0.15, 1.2))
 
         elec_eff = self.electrode_efficiency()
         p_rad = min(P_AC_MAX_W, p_drive * stack_eff * coupling * area_ratio * elec_eff)
         remain = max(0.0, p_drive - p_rad)
-        w_glue = (0.20 + mismatch_extra) * (0.7 + 0.3 * glue_scale)
-        w_pzt = 0.70
-        w_ti = 0.10
+        w_glue = (0.20 + mismatch_extra) * (0.7 + 0.3 * glue_scale) * gs.w_glue_mul
+        w_pzt = 0.70 * gs.w_pzt_mul
+        w_ti = 0.10 * gs.w_ti_mul
         w_sum = w_glue + w_pzt + w_ti
         eff = p_rad / p_drive if p_drive > 0 else 0.0
         return EnergyPartition(
@@ -1057,6 +1219,9 @@ class AcousticBowl:
                 "cup_depth_m": p.cup_depth_m,
                 "piezo_diameter_m": p.piezo_diameter_m,
                 "glue_thickness_m": p.glue_thickness_m,
+                "glue_attn_scale": float(getattr(p, "glue_attn_scale", 1.0) or 1.0),
+                "glue_spread_scenario": str(getattr(p, "glue_spread_scenario", "ideal") or "ideal"),
+                "glue_coverage": float(getattr(p, "glue_coverage", 1.0) or 1.0),
                 "gel_thickness_m": p.gel_thickness_m,
                 "matching_enabled": p.matching_enabled,
                 "matching_material": p.matching_material,
@@ -1175,6 +1340,8 @@ def bowl_params_from_dict(
         "face_z_mrayl": lambda x: None if x is None else float(x),
         "load_z_mrayl": lambda x: None if x is None else float(x),
         "glue_attn_scale": float,
+        "glue_spread_scenario": str,
+        "glue_coverage": float,
     }
     for key, caster in mapping.items():
         if key in data and data[key] is not None:
@@ -1238,6 +1405,9 @@ def bowl_params_from_dict(
     p.r_ti_return_ohm = float(np.clip(p.r_ti_return_ohm, 0.0, 50.0))
     p.stack_efficiency = float(np.clip(p.stack_efficiency, 0.1, 1.0))
     p.glue_attn_scale = float(np.clip(getattr(p, "glue_attn_scale", 1.0) or 1.0, 0.2, 5.0))
+    scen = str(getattr(p, "glue_spread_scenario", "ideal") or "ideal")
+    p.glue_spread_scenario = resolve_glue_spread(scen).key
+    p.glue_coverage = float(np.clip(float(getattr(p, "glue_coverage", 1.0) or 1.0), 0.2, 1.0))
     p.f0_hz = validate_f0(p.f0_hz)
     if p.backing not in ("air", "heavy"):
         p.backing = "air"

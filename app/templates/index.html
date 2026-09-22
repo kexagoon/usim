@@ -590,6 +590,30 @@
                 <input type="number" id="bowlGlueH" min="1" max="50" step="1" value="10" />
                 <small class="help" data-i18n="bowl.help_glue"></small>
               </label>
+              <div class="glue-spread-block" id="bowlGlueSpreadBlock">
+                <div class="label-row glue-spread-head">
+                  <span data-i18n="bowl.glue_spread">Kleberverteilung Piezo ↔ Titan</span>
+                  <span class="info" data-i18n-title="bowl.help_glue_spread" title="">?</span>
+                </div>
+                <div class="preset-chips glue-spread-chips" id="bowlGlueSpread" role="group" aria-label="Glue spread scenario">
+                  <button type="button" class="preset-chip active" data-glue-spread="ideal" data-i18n="bowl.glue_spread_ideal">Ideal / gleichmäßig</button>
+                  <button type="button" class="preset-chip" data-glue-spread="thin_wet" data-i18n="bowl.glue_spread_thin_wet">Dünn / knapp benetzt</button>
+                  <button type="button" class="preset-chip" data-glue-spread="thick_fillet" data-i18n="bowl.glue_spread_thick_fillet">Dick / Wulst am Rand</button>
+                  <button type="button" class="preset-chip" data-glue-spread="bias_piezo" data-i18n="bowl.glue_spread_bias_piezo">Mehr zum Piezo</button>
+                  <button type="button" class="preset-chip" data-glue-spread="bias_ti" data-i18n="bowl.glue_spread_bias_ti">Mehr zum Titan</button>
+                  <button type="button" class="preset-chip" data-glue-spread="islands" data-i18n="bowl.glue_spread_islands">Unregelmäßig / Inseln</button>
+                </div>
+                <input type="hidden" id="bowlGlueSpreadScenario" value="ideal" />
+                <label class="glue-coverage-label"><span class="label-row"><span data-i18n="bowl.glue_coverage">Kontaktfläche / Benetzung (%)</span>
+                  <span class="info" data-i18n-title="bowl.help_glue_coverage" title="">?</span></span>
+                  <div class="glue-coverage-row">
+                    <input type="range" id="bowlGlueCoverage" min="20" max="100" step="5" value="100" />
+                    <output id="bowlGlueCoverageOut" for="bowlGlueCoverage">100 %</output>
+                  </div>
+                </label>
+                <p class="help glue-spread-help" data-i18n="bowl.help_glue_spread"></p>
+                <p class="hint muted glue-spread-hint" id="bowlGlueSpreadHint" data-i18n="bowl.glue_spread_hint_ideal"></p>
+              </div>
               <label><span class="label-row"><span data-i18n="bowl.gel_h">Gel (mm)</span>
                 <span class="info" data-i18n-title="bowl.help_gel" title="">?</span></span>
                 <input type="number" id="bowlGelH" min="0.05" max="1" step="0.05" value="0.3" />
@@ -875,6 +899,9 @@
             <div class="card-head">
               <h2 class="card-title" data-i18n="bowl.energy">Energy</h2>
               <div class="chart-tools">
+                <button type="button" class="chart-tool-btn chart-tool-btn-text" id="btnBowlEnergyRefresh" data-i18n-title="bowl.btn_energy_refresh_title" title="Energie neu berechnen" aria-label="Energie neu berechnen">
+                  <span aria-hidden="true">↺</span><span data-energy-label data-i18n="bowl.btn_energy_refresh">Energie neu berechnen</span>
+                </button>
                 <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlEnergy" data-info-key="bowl.info_energy" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>

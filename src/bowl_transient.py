@@ -13,7 +13,7 @@ from typing import Any
 
 import numpy as np
 
-from src.acoustic_bowl import AcousticBowl, _load_bowl_yaml
+from src.acoustic_bowl import AcousticBowl, _load_bowl_yaml, resolve_glue_spread
 
 
 DURATION_MAX_S = 720.0  # 12 min
@@ -131,14 +131,19 @@ def _heat_capacities(bowl: AcousticBowl, th: ThermalParams) -> dict[str, float]:
     h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
     a_pzt = math.pi * (min(p.piezo_diameter_m, p.cup_inner_diameter_m) / 2.0) ** 2
     a_ti = math.pi * (p.ti_diameter_m / 2.0) ** 2
-    a_glue = a_pzt
+    gs = resolve_glue_spread(
+        getattr(p, "glue_spread_scenario", "ideal"),
+        getattr(p, "glue_coverage", 1.0),
+    )
+    a_glue = a_pzt * gs.coverage
     # Cup outer surface for convection (bottom + approximate side wall)
     wall_area = math.pi * p.cup_outer_diameter_m * max(p.cup_depth_m, 1e-3)
     a_cool = a_ti + wall_area
 
     v_pzt = a_pzt * h_pzt
-    # Effective glue bond zone ≥ 50 µm participating thickness (calib floor)
-    v_glue = a_glue * max(p.glue_thickness_m, 5e-5)
+    # Effective glue bond zone ≥ 50 µm participating thickness (calib floor);
+    # coverage / vol_mul reflect partial wetting or fillet mass
+    v_glue = a_glue * max(p.glue_thickness_m, 5e-5) * gs.vol_mul
     v_ti_bottom = a_ti * max(p.ti_thickness_m, 1e-5)
     # Side-wall Ti mass contribution (approx cylindrical shell)
     r_o = p.cup_outer_diameter_m / 2.0
@@ -221,8 +226,12 @@ def run_bowl_transient(
     c_p, c_g, c_ti, c_ld = caps["piezo"], caps["glue"], caps["ti"], caps["load"]
     a_p, a_ti = caps["area_piezo"], caps["area_ti"]
     a_cool = caps.get("area_cool", a_ti)
-    g_pg = th.g_piezo_glue_w_k
-    g_gt = th.g_glue_ti_w_k
+    gs_th = resolve_glue_spread(
+        getattr(bowl.params, "glue_spread_scenario", "ideal"),
+        getattr(bowl.params, "glue_coverage", 1.0),
+    )
+    g_pg = th.g_piezo_glue_w_k * gs_th.g_pg_mul
+    g_gt = th.g_glue_ti_w_k * gs_th.g_gt_mul
     g_tl = th.g_ti_load_w_k if th.include_load_node else 0.0
     h = th.h_conv_w_m2k
     t_amb = th.t_amb_c
@@ -371,6 +380,21 @@ def run_bowl_transient(
         "dt_s": dt,
         "n_steps": n_steps,
         "thermal": asdict(th),
+        "glue_spread": {
+            "scenario": gs_th.key,
+            "coverage": gs_th.coverage,
+            "attn_mul": gs_th.attn_mul,
+            "mismatch_mul": gs_th.mismatch_mul,
+            "h_eff_mul": gs_th.h_eff_mul,
+            "w_glue_mul": gs_th.w_glue_mul,
+            "w_pzt_mul": gs_th.w_pzt_mul,
+            "w_ti_mul": gs_th.w_ti_mul,
+            "g_pg_mul": gs_th.g_pg_mul,
+            "g_gt_mul": gs_th.g_gt_mul,
+            "vol_mul": gs_th.vol_mul,
+            "g_piezo_glue_eff_w_k": g_pg,
+            "g_glue_ti_eff_w_k": g_gt,
+        },
         "capacities_j_k": {
             "piezo": c_p,
             "glue": c_g,

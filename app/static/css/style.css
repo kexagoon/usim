@@ -1170,3 +1170,86 @@ details.nested { margin-top: 8px; border-left: 2px solid var(--border, #445); pa
     max-height: 28vh;
   }
 }
+
+
+/* ---- Glue spread scenarios (piezo ↔ titanium) ---- */
+.glue-spread-block {
+  margin: 0.65rem 0 0.85rem;
+  padding: 0.7rem 0.75rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--accent) 8%, var(--panel-2)) 0%,
+      var(--panel-2) 55%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+.glue-spread-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+  font-weight: 650;
+  font-size: 0.86rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+.glue-spread-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+.glue-spread-chips .preset-chip {
+  font-size: 0.72rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  line-height: 1.25;
+}
+.glue-spread-chips .preset-chip.active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.glue-coverage-label {
+  display: block;
+  margin: 0.25rem 0 0.15rem;
+}
+.glue-coverage-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.25rem;
+}
+.glue-coverage-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+.glue-coverage-row output {
+  min-width: 3.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--accent);
+}
+.glue-spread-help {
+  margin: 0.35rem 0 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.glue-spread-hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--accent) 55%, var(--muted));
+}
+.energy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 8px;
+}

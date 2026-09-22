@@ -24,6 +24,7 @@ from src.acoustic_bowl import (
     compare_bowl_presets,
     default_bowl_params,
     params_help,
+    resolve_glue_spread,
 )
 from src.bowl_transient import (
     default_thermal_params,
@@ -51,9 +52,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.3.1-temps-info",
-            "usim_build": _os.environ.get("USIM_BUILD", "temps-refresh-info-2026-09-22"),
-            "note": "Detailed chart info; temps destroy/recreate + dedicated refresh; bumpChart; Ti 0.05–3 mm 2026-09-22",
+            "version": "1.3.2-energy-glue",
+            "usim_build": _os.environ.get("USIM_BUILD", "energy-refresh-glue-2026-09-22"),
+            "note": "Energieaufteilung dedicated refresh+destroy/recreate; glue_spread_scenario piezo↔Ti; /api/bowl/energy; 2026-09-22",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -424,6 +425,9 @@ class BowlParamsIn(BaseModel):
     piezo_z_mrayl: float | None = None
     face_z_mrayl: float | None = None
     load_z_mrayl: float | None = None
+    glue_attn_scale: float | None = None
+    glue_spread_scenario: str | None = None
+    glue_coverage: float | None = None
     # Thermal / transient calib (applied on Analysieren with other settings)
     t_amb_c: float | None = None
     t_warn_c: float | None = None
@@ -702,6 +706,160 @@ async def api_bowl_transient_get() -> dict[str, Any]:
     out = dict(_bowl_transient_cache)
     out["cached"] = True
     return out
+
+
+class BowlEnergyIn(BaseModel):
+    """Light energy-partition refresh (cold + optional heated end state)."""
+
+    duration_s: float | None = Field(None, ge=1.0, le=720.0)
+    dt_s: float | None = Field(None, ge=0.05, le=0.5)
+    include_heated: bool = True
+    t_amb_c: float | None = None
+    t_warn_c: float | None = None
+    t_off_c: float | None = None
+    h_conv_w_m2k: float | None = None
+    g_piezo_glue_w_k: float | None = None
+    g_glue_ti_w_k: float | None = None
+    g_ti_load_w_k: float | None = None
+    k_glue_loss_per_c: float | None = None
+    k_eff_drop_per_c: float | None = None
+    k_kt_drop_per_c: float | None = None
+    k_res_shift_hz_per_c: float | None = None
+    include_load_node: bool | None = None
+    derate_smooth: bool | None = None
+
+
+def _energy_dict(e: Any) -> dict[str, float]:
+    return {
+        "p_drive_w": float(getattr(e, "p_drive_w", 0.0) or 0.0),
+        "p_radiated_w": float(getattr(e, "p_radiated_w", 0.0) or 0.0),
+        "p_glue_loss_w": float(getattr(e, "p_glue_loss_w", 0.0) or 0.0),
+        "p_piezo_heat_w": float(getattr(e, "p_piezo_heat_w", 0.0) or 0.0),
+        "p_ti_loss_w": float(getattr(e, "p_ti_loss_w", 0.0) or 0.0),
+        "efficiency": float(getattr(e, "efficiency", 0.0) or 0.0),
+        "bandwidth_factor": float(getattr(e, "bandwidth_factor", 1.0) or 1.0),
+    }
+
+
+@app.post("/api/bowl/energy")
+async def api_bowl_energy_post(body: BowlEnergyIn | None = None) -> dict[str, Any]:
+    """Cold (+ optional heated) energy partition from current bowl params.
+
+    Does not run the full 13-chart analyze suite — intended for Energieaufteilung
+    per-chart refresh. Heated end uses the same transient path as temps refresh.
+    """
+    global _bowl_thermal, _bowl_transient_cache
+    from dataclasses import asdict as _asdict
+
+    data = body.model_dump(exclude_none=True) if body is not None else {}
+    include_heated = bool(data.pop("include_heated", True))
+    duration_s = data.pop("duration_s", None)
+    dt_s = data.pop("dt_s", None)
+    if data:
+        _bowl_thermal = thermal_params_from_dict(data, _bowl_thermal)
+
+    bowl = _get_bowl()
+    gs = resolve_glue_spread(
+        getattr(bowl.params, "glue_spread_scenario", "ideal"),
+        getattr(bowl.params, "glue_coverage", 1.0),
+    )
+    energy_start = _energy_dict(bowl.energy_partition())
+    energy_end = dict(energy_start)
+    heated = False
+    transient_summary: dict[str, Any] | None = None
+
+    if include_heated:
+        dur = float(duration_s) if duration_s is not None else float(
+            getattr(_bowl_thermal, "duration_default_s", 60.0) or 60.0
+        )
+        result = run_bowl_transient(
+            bowl,
+            duration_s=dur,
+            dt_s=dt_s,
+            thermal=_bowl_thermal,
+        )
+        _bowl_transient_cache = result
+        heated = True
+        sum_ = result.get("summary") or {}
+        if sum_.get("energy_start"):
+            energy_start = {
+                "p_drive_w": energy_start.get("p_drive_w", 0.0),
+                **{k: float(sum_["energy_start"].get(k, 0.0) or 0.0)
+                   for k in ("p_radiated_w", "p_glue_loss_w", "p_piezo_heat_w", "p_ti_loss_w", "efficiency")},
+                "bandwidth_factor": energy_start.get("bandwidth_factor", 1.0),
+            }
+        if sum_.get("energy_end"):
+            energy_end = {
+                "p_drive_w": energy_start.get("p_drive_w", 0.0),
+                **{k: float(sum_["energy_end"].get(k, 0.0) or 0.0)
+                   for k in ("p_radiated_w", "p_glue_loss_w", "p_piezo_heat_w", "p_ti_loss_w", "efficiency")},
+                "bandwidth_factor": energy_start.get("bandwidth_factor", 1.0),
+            }
+        transient_summary = {
+            "duration_s": result.get("duration_s"),
+            "dt_s": result.get("dt_s"),
+            "P_ac_start_w": sum_.get("P_ac_start_w"),
+            "P_ac_end_w": sum_.get("P_ac_end_w"),
+            "glue_loss_factor_end": sum_.get("glue_loss_factor_end"),
+        }
+
+    return {
+        "calibration": True,
+        "heated": heated,
+        "energy_start": energy_start,
+        "energy_end": energy_end,
+        "glue_spread": {
+            "scenario": gs.key,
+            "coverage": gs.coverage,
+            "attn_mul": gs.attn_mul,
+            "mismatch_mul": gs.mismatch_mul,
+            "h_eff_mul": gs.h_eff_mul,
+            "w_glue_mul": gs.w_glue_mul,
+            "w_pzt_mul": gs.w_pzt_mul,
+            "w_ti_mul": gs.w_ti_mul,
+            "g_pg_mul": gs.g_pg_mul,
+            "g_gt_mul": gs.g_gt_mul,
+            "vol_mul": gs.vol_mul,
+        },
+        "params": {
+            "glue_spread_scenario": getattr(bowl.params, "glue_spread_scenario", "ideal"),
+            "glue_coverage": getattr(bowl.params, "glue_coverage", 1.0),
+            "glue_thickness_m": bowl.params.glue_thickness_m,
+            "glue_attn_scale": getattr(bowl.params, "glue_attn_scale", 1.0),
+        },
+        "thermal": _asdict(_bowl_thermal),
+        "transient_summary": transient_summary,
+    }
+
+
+@app.get("/api/bowl/energy")
+async def api_bowl_energy_get() -> dict[str, Any]:
+    """Cold energy partition for current server bowl params (no transient)."""
+    bowl = _get_bowl()
+    gs = resolve_glue_spread(
+        getattr(bowl.params, "glue_spread_scenario", "ideal"),
+        getattr(bowl.params, "glue_coverage", 1.0),
+    )
+    e = _energy_dict(bowl.energy_partition())
+    return {
+        "calibration": True,
+        "heated": False,
+        "energy_start": e,
+        "energy_end": dict(e),
+        "glue_spread": {
+            "scenario": gs.key,
+            "coverage": gs.coverage,
+            "attn_mul": gs.attn_mul,
+            "mismatch_mul": gs.mismatch_mul,
+            "h_eff_mul": gs.h_eff_mul,
+            "w_glue_mul": gs.w_glue_mul,
+            "w_pzt_mul": gs.w_pzt_mul,
+            "w_ti_mul": gs.w_ti_mul,
+            "g_pg_mul": gs.g_pg_mul,
+            "g_gt_mul": gs.g_gt_mul,
+            "vol_mul": gs.vol_mul,
+        },
+    }
 
 
 @app.post("/api/bowl/compare")
