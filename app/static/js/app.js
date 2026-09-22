@@ -14,6 +14,8 @@
   let bowlEnergyPhase = "end";
   let bowlAnalyzeBusy = false;
   let bowlAbort = null;
+  let bowlTempsBusy = false;
+  let bowlTempsAbort = null;
 
   function $(id) { return document.getElementById(id); }
   function t(key) {
@@ -80,6 +82,69 @@
       if (typeof ch.stop === "function") ch.stop();
       ch.update("none");
     } catch (err) { console.warn("bumpChart", err); }
+  }
+
+  function freshArray(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((v) => (typeof v === "number" ? v : Number(v)));
+  }
+
+  /** Destroy Chart.js instance and replace the canvas node (heals intermittent freezes). */
+  function recreateLineChart(canvasId, chartKey, buildFn) {
+    try {
+      const prev = bowlCharts[chartKey];
+      if (prev) {
+        try { if (typeof prev.stop === "function") prev.stop(); } catch (_) { /* ignore */ }
+        try { prev.destroy(); } catch (_) { /* ignore */ }
+        bowlCharts[chartKey] = null;
+      }
+      const old = $(canvasId);
+      if (!old || !old.parentNode) return null;
+      const neu = document.createElement("canvas");
+      neu.id = canvasId;
+      if (old.className) neu.className = old.className;
+      old.parentNode.replaceChild(neu, old);
+      const ch = buildFn(neu);
+      bowlCharts[chartKey] = ch;
+      return ch;
+    } catch (err) {
+      console.warn("recreateLineChart", canvasId, err);
+      return bowlCharts[chartKey] || null;
+    }
+  }
+
+  function buildTempsChart(canvasEl) {
+    const el = canvasEl || $("chartBowlTemps");
+    if (!el) return null;
+    const ch = new Chart(el, {
+      type: "line",
+      data: {
+        labels: [],
+        datasets: [
+          { label: t("bowl.legend_t_piezo") || "T_piezo", data: [], borderColor: "#e6a817", backgroundColor: "transparent", borderWidth: 2.5, pointRadius: 0, tension: 0 },
+          { label: t("bowl.legend_t_glue") || "T_glue", data: [], borderColor: "#c45c26", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, tension: 0 },
+          { label: t("bowl.legend_t_ti") || "T_Ti", data: [], borderColor: "#8a9ba8", backgroundColor: "transparent", borderWidth: 2, pointRadius: 0, tension: 0 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        animations: false,
+        transitions: { active: { animation: { duration: 0 } }, resize: { animation: { duration: 0 } } },
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { display: true } },
+        scales: {
+          x: { title: { display: true, text: t("bowl.time_s") || "t (s)" }, ticks: { maxTicksLimit: 8 }, grid: { color: Chart.defaults.borderColor } },
+          y: { title: { display: true, text: "T (°C)" }, grid: { color: Chart.defaults.borderColor } },
+        },
+      },
+    });
+    return ch;
+  }
+
+  function ensureTempsChartFresh() {
+    return recreateLineChart("chartBowlTemps", "temps", (el) => buildTempsChart(el));
   }
 
   function initTherapyCharts() {
@@ -598,15 +663,7 @@
       bowlCharts.phase.options.scales.x.title.text = "f (MHz)";
       bowlCharts.phase.options.scales.y.title.text = "phase (rad)";
     }
-    bowlCharts.temps = lineChart("chartBowlTemps", "T_piezo", "#e6a817");
-    if (bowlCharts.temps) {
-      bowlCharts.temps.data.datasets.push(
-        { label: "T_glue", data: [], borderColor: "#c45c26", borderWidth: 2, pointRadius: 0, backgroundColor: "transparent" },
-        { label: "T_Ti", data: [], borderColor: "#8a9ba8", borderWidth: 2, pointRadius: 0, backgroundColor: "transparent" }
-      );
-      bowlCharts.temps.options.scales.x.title.text = "t (s)";
-      bowlCharts.temps.options.scales.y.title.text = "T (°C)";
-    }
+    bowlCharts.temps = buildTempsChart($("chartBowlTemps"));
     bowlCharts.pacEta = lineChart("chartBowlPacEta", "P_ac", "#2dd4a8");
     if (bowlCharts.pacEta) {
       bowlCharts.pacEta.data.datasets.push({ label: "η", data: [], borderColor: "#c084fc", borderWidth: 2, pointRadius: 0, backgroundColor: "transparent", yAxisID: "y1" });
@@ -979,43 +1036,95 @@
       if ($("bowlTGlueMax")) $("bowlTGlueMax").textContent = (sum.T_glue_max_c != null ? Number(sum.T_glue_max_c).toFixed(1) : "—") + " °C";
       if ($("bowlDerateMin")) $("bowlDerateMin").textContent = sum.derate_min != null ? Number(sum.derate_min).toFixed(2) : "—";
     }
-    if (bowlCharts.temps) {
-      bowlCharts.temps.data.labels = labels;
-      bowlCharts.temps.data.datasets[0].data = (s.T_piezo_c || []).slice();
-      bowlCharts.temps.data.datasets[1].data = (s.T_glue_c || []).slice();
-      bowlCharts.temps.data.datasets[2].data = (s.T_ti_c || []).slice();
-      clearChartYAutoscale(bowlCharts.temps);
-      bumpChart(bowlCharts.temps);
-      try {
-        if (typeof bowlCharts.temps.resize === "function") bowlCharts.temps.resize();
-      } catch (_) { /* ignore */ }
+    // Temps chart: always destroy+recreate canvas to avoid intermittent Chart.js freezes
+    try {
+      const chT = ensureTempsChartFresh();
+      if (chT) {
+        chT.data.labels = labels.slice();
+        chT.data.datasets[0].data = freshArray(s.T_piezo_c);
+        chT.data.datasets[1].data = freshArray(s.T_glue_c);
+        chT.data.datasets[2].data = freshArray(s.T_ti_c);
+        clearChartYAutoscale(chT);
+        if (typeof chT.resize === "function") chT.resize();
+        bumpChart(chT);
+      }
+    } catch (terr) {
+      console.warn("temps chart recreate", terr);
     }
     if (bowlCharts.pacEta) {
       bowlCharts.pacEta.data.labels = labels;
-      bowlCharts.pacEta.data.datasets[0].data = (s.P_ac_w || []).slice();
-      bowlCharts.pacEta.data.datasets[1].data = (s.eta || []).slice();
+      bowlCharts.pacEta.data.datasets[0].data = freshArray(s.P_ac_w);
+      bowlCharts.pacEta.data.datasets[1].data = freshArray(s.eta);
       clearChartYAutoscale(bowlCharts.pacEta);
       bumpChart(bowlCharts.pacEta);
     }
     if (bowlCharts.derate) {
       bowlCharts.derate.data.labels = labels;
-      bowlCharts.derate.data.datasets[0].data = (s.drive_level || []).slice();
-      bowlCharts.derate.data.datasets[1].data = (s.derate || []).slice();
+      bowlCharts.derate.data.datasets[0].data = freshArray(s.drive_level);
+      bowlCharts.derate.data.datasets[1].data = freshArray(s.derate);
       clearChartYAutoscale(bowlCharts.derate);
       bumpChart(bowlCharts.derate);
     }
     if (bowlCharts.losses) {
       bowlCharts.losses.data.labels = labels;
-      bowlCharts.losses.data.datasets[0].data = (s.P_piezo_heat_w || []).slice();
-      bowlCharts.losses.data.datasets[1].data = (s.P_glue_loss_w || []).slice();
-      bowlCharts.losses.data.datasets[2].data = (s.P_ti_loss_w || []).slice();
-      bowlCharts.losses.data.datasets[3].data = (s.glue_loss_factor || []).slice();
+      bowlCharts.losses.data.datasets[0].data = freshArray(s.P_piezo_heat_w);
+      bowlCharts.losses.data.datasets[1].data = freshArray(s.P_glue_loss_w);
+      bowlCharts.losses.data.datasets[2].data = freshArray(s.P_ti_loss_w);
+      bowlCharts.losses.data.datasets[3].data = freshArray(s.glue_loss_factor);
       clearChartYAutoscale(bowlCharts.losses);
       bumpChart(bowlCharts.losses);
     }
   }
 
+  async function refreshBowlTempsOnly() {
+    if (bowlTempsBusy) return;
+    bowlTempsBusy = true;
+    const btn = $("btnBowlTempsRefresh");
+    const labelBusy = t("bowl.btn_temps_refresh_busy");
+    const labelIdle = t("bowl.btn_temps_refresh");
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-busy");
+      const span = btn.querySelector("[data-temps-label]");
+      if (span) span.textContent = labelBusy;
+      else btn.textContent = labelBusy;
+    }
+    if (bowlTempsAbort) {
+      try { bowlTempsAbort.abort(); } catch (_) { /* ignore */ }
+    }
+    bowlTempsAbort = new AbortController();
+    const signal = bowlTempsAbort.signal;
+    try {
+      ensureBowl();
+      await postJSON("/api/bowl/params", bowlPayload(), signal);
+      const tr = await postJSON("/api/bowl/transient", transientPayload(), signal);
+      renderBowlTransient(tr);
+      const tmOk = $("bowlTransientMetrics");
+      if (tmOk) tmOk.removeAttribute("title");
+      if (btn) btn.title = t("bowl.btn_temps_refresh_title");
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      console.warn("refreshBowlTempsOnly", err);
+      const hint = String((err && err.message) || err || "temps refresh failed");
+      if (btn) btn.title = hint;
+      const tm = $("bowlTransientMetrics");
+      if (tm) tm.setAttribute("title", "Temps: " + hint);
+    } finally {
+      bowlTempsBusy = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+        const span = btn.querySelector("[data-temps-label]");
+        if (span) {
+          span.setAttribute("data-i18n", "bowl.btn_temps_refresh");
+          span.textContent = labelIdle;
+        } else btn.textContent = labelIdle;
+      }
+    }
+  }
+
   async function resetBowl() {
+
     const data = await (await fetch("/api/bowl/params")).json();
     applyBowlParamsToForm(data.params || {});
     $("bowlPiezoAuto").checked = true;
@@ -1224,6 +1333,8 @@
   if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("input", () => clampPiezoDiameter(true));
   if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("change", () => clampPiezoDiameter(true));
   $("btnBowlAnalyze").addEventListener("click", analyzeBowl);
+  if ($("btnBowlTempsRefresh")) $("btnBowlTempsRefresh").addEventListener("click", refreshBowlTempsOnly);
+
   document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
     b.addEventListener("click", () => applyEnergyDoughnut(b.dataset.phase));
   });
@@ -1332,12 +1443,28 @@
     if (!s || s.startsWith("bowl.info_") || s.startsWith("therapy.info_")) {
       return "<p><em>" + (s || "—") + "</em></p>";
     }
-    return s.split(/\n\n+/).map((p) => {
-      const escaped = p.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      if (/^CALIBRATION|^КАЛИБРОВКА|^KALIBRIERUNG/i.test(p.trim())) {
-        return '<span class="info-calib">' + escaped.trim() + "</span>";
+    const esc = (x) => String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const sectionRe = /^(Was gezeigt wird|Physik \/ Modell|Eingaben.*|Formeln.*|Handrechnung.*|Nutzen|Button.*|Что показано|Физика \/ модель|Входы.*|Формулы.*|Ручной пересчёт.*|Зачем|Кнопка.*)$/i;
+    return s.split(/\n\n+/).map((block) => {
+      const lines = block.split(/\n/).map((l) => l.trimEnd());
+      const head = (lines[0] || "").trim();
+      if (/^CALIBRATION|^КАЛИБРОВКА|^KALIBRIERUNG/i.test(head)) {
+        return '<div class="info-calib">' + esc(block.trim()) + "</div>";
       }
-      return "<p>" + escaped.replace(/\n/g, "<br>") + "</p>";
+      if (sectionRe.test(head) && lines.length > 1) {
+        const body = lines.slice(1).filter((l) => l.length);
+        const isList = body.length >= 2 && body.every((l) => /^(\d+[).]\s+|[-•]\s+)/.test(l.trim()));
+        if (isList) {
+          const items = body.map((l) => "<li>" + esc(l.replace(/^(\d+[).]\s+|[-•]\s+)/, "")) + "</li>").join("");
+          return '<div class="info-section"><h4 class="info-h">' + esc(head) + "</h4><ol class=\"info-ol\">" + items + "</ol></div>";
+        }
+        return '<div class="info-section"><h4 class="info-h">' + esc(head) + "</h4><p>" + body.map(esc).join("<br>") + "</p></div>";
+      }
+      if (lines.length >= 2 && lines.every((l) => !l || /^\d+[).]\s+/.test(l.trim()))) {
+        const items = lines.filter(Boolean).map((l) => "<li>" + esc(l.replace(/^\d+[).]\s+/, "")) + "</li>").join("");
+        return "<ol class=\"info-ol\">" + items + "</ol>";
+      }
+      return "<p>" + esc(block.trim()).replace(/\n/g, "<br>") + "</p>";
     }).join("");
   }
 

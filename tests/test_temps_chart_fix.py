@@ -1,4 +1,4 @@
-"""Heating charts must use bumpChart and run transient before spectrum sweeps."""
+"""Heating charts: bumpChart, transient-first, destroy/recreate temps, dedicated refresh."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_JS = ROOT / "app" / "static" / "js" / "app.js"
+INDEX = ROOT / "app" / "templates" / "index.html"
 
 
 def test_bump_chart_helper_and_none_updates():
@@ -17,7 +18,6 @@ def test_bump_chart_helper_and_none_updates():
 
 def test_analyze_bowl_transient_before_spectrum():
     src = APP_JS.read_text(encoding="utf-8")
-    # Inside analyzeBowl, transient POST must appear before spectrum GET
     start = src.find("async function analyzeBowl()")
     end = src.find("function renderBowlTransient", start)
     assert start > 0 and end > start
@@ -27,12 +27,23 @@ def test_analyze_bowl_transient_before_spectrum():
     assert 0 <= idx_tr < idx_spec, "transient must run before spectrum in analyzeBowl"
 
 
-def test_render_bowl_transient_uses_slice_and_bump():
+def test_render_bowl_transient_recreates_temps_chart():
     src = APP_JS.read_text(encoding="utf-8")
     start = src.find("function renderBowlTransient")
-    end = src.find("async function resetBowl", start)
+    end = src.find("async function refreshBowlTempsOnly", start)
+    if end < 0:
+        end = src.find("async function resetBowl", start)
     body = src[start:end]
-    assert "(s.T_piezo_c || []).slice()" in body
-    assert "bumpChart(bowlCharts.temps)" in body
-    assert "clearChartYAutoscale" in body
-    assert "bowlCharts.temps.resize" in body
+    assert "ensureTempsChartFresh" in body
+    assert "freshArray(s.T_piezo_c)" in body
+    assert "recreateLineChart" in src
+    assert "function buildTempsChart" in src
+    assert "function refreshBowlTempsOnly" in src
+    assert 'postJSON("/api/bowl/transient"' in src[src.find("async function refreshBowlTempsOnly") :]
+
+
+def test_temps_refresh_button_in_html():
+    html = INDEX.read_text(encoding="utf-8")
+    assert 'id="btnBowlTempsRefresh"' in html
+    assert "bowl.btn_temps_refresh" in html
+    assert 'data-chart-expand="chartBowlTemps"' in html

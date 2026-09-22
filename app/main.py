@@ -51,9 +51,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.3.0-chart-expand",
-            "usim_build": _os.environ.get("USIM_BUILD", "chart-fullscreen-2026-09-21"),
-            "note": "Chart fullscreen+info modal; wide Ti sweep ~0.05–3.0 mm; bumpChart analyze-on-demand 2026-09-21",
+            "version": "1.3.1-temps-info",
+            "usim_build": _os.environ.get("USIM_BUILD", "temps-refresh-info-2026-09-22"),
+            "note": "Detailed chart info; temps destroy/recreate + dedicated refresh; bumpChart; Ti 0.05–3 mm 2026-09-22",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),

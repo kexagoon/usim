@@ -88,6 +88,15 @@ def test_locale_info_keys_de_ru():
             assert key in bowl, f"missing bowl.{key} in {lang}"
             assert isinstance(bowl[key], str) and len(bowl[key]) > 2
         assert "CALIBRATION" in bowl["info_ti"] or "калибр" in bowl["info_ti"].lower()
+        # Professional detail: formulas / hand-check sections
+        assert len(bowl["info_temps"]) > 800
+        assert "energy_partition" in bowl["info_temps"] or "Q_p" in bowl["info_temps"] or "Q_p" in bowl["info_spectrum"]
+        for ik in ("info_spectrum", "info_temps", "info_energy"):
+            assert "Z" in bowl[ik] or "Q_" in bowl[ik] or "P_drive" in bowl[ik] or "derate" in bowl[ik]
+        assert "btn_temps_refresh" in bowl
+        therapy = data["therapy"]
+        for tk in ("info_ix", "info_tx", "info_dose", "info_soc", "info_burst", "info_fsm"):
+            assert tk in therapy and len(therapy[tk]) > 80
 
 
 def test_build_stamp_chart_expand():
@@ -95,5 +104,5 @@ def test_build_stamp_chart_expand():
     r = client.get("/api/build")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.3.0-chart-expand"
-    assert "chart-fullscreen" in body["usim_build"]
+    assert body["version"] == "1.3.1-temps-info"
+    assert "temps-refresh-info" in body["usim_build"]
