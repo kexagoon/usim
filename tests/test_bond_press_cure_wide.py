@@ -139,5 +139,5 @@ def test_i18n_press_cure_keys():
 def test_build_stamp_bond_wide():
     client = TestClient(app)
     body = client.get("/api/build").json()
-    assert body["version"] == "1.3.3-bond-wide"
-    assert "bond-press-cure-wide" in body["usim_build"]
+    assert body["version"] == "1.3.4-ti-shape"
+    assert "ti-shape" in body["usim_build"]

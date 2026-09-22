@@ -104,5 +104,5 @@ def test_build_stamp_chart_expand():
     r = client.get("/api/build")
     assert r.status_code == 200
     body = r.json()
-    assert body["version"] == "1.3.3-bond-wide"
-    assert "bond-press-cure-wide" in body["usim_build"]
+    assert body["version"] == "1.3.4-ti-shape"
+    assert "ti-shape-wave" in body["usim_build"]

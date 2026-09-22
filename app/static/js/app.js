@@ -531,6 +531,7 @@
       glue_coverage: Math.max(0.2, Math.min(1, (parseFloat(($("bowlGlueCoverage") || { value: 100 }).value) || 100) / 100)),
       glue_press: (($("bowlGluePress") || { value: "medium" }).value || "medium"),
       glue_cure_fraction: Math.max(0, Math.min(1, (parseFloat(($("bowlGlueCure") || { value: 100 }).value) || 100) / 100)),
+      ti_face_shape: (($("bowlTiFaceShapeVal") || { value: "cup" }).value || "cup"),
       duration_s: bowlDurationSeconds(),
       dt_s: parseFloat(($("bowlDtS") || { value: 0.15 }).value),
     };
@@ -610,6 +611,7 @@
     if (p.glue_spread_scenario) setGlueSpreadScenario(p.glue_spread_scenario, false);
     if (p.glue_press) setGluePress(p.glue_press, false);
     if (p.glue_cure_fraction != null) setGlueCure(Math.round(Number(p.glue_cure_fraction) * 100), false);
+    if (p.ti_face_shape) setTiFaceShape(p.ti_face_shape, false);
     if (p.glue_coverage != null && $("bowlGlueCoverage")) {
       const pct = Math.round(Number(p.glue_coverage) * 100);
       $("bowlGlueCoverage").value = String(Math.max(20, Math.min(100, pct)));
@@ -795,77 +797,128 @@
     const showDrop = !!g.droplet_demo && driveOn && (load.includes("water") || load.includes("gel"));
     const depthMm = ((g.cup_depth_m || 0.004) * 1e3);
     const wallPx = Math.max(10, Math.min(28, (g.cup_wall_thickness_m || 5e-4) * 2e4));
+    const shape = (g.ti_face_shape || (($("bowlTiFaceShapeVal") || {}).value) || "cup");
     const cupW = 220;
     const cupX = 80;
     const cupTop = 110;
     const cupH = Math.max(70, Math.min(140, 40 + depthMm * 12));
-    const bottomH = Math.max(14, Math.min(28, (g.ti_bottom_thickness_m || 3e-4) * 4e4));
+    const bottomH = Math.max(14, Math.min(36, (g.ti_bottom_thickness_m || 3e-4) * 4e4));
     const piezoW = Math.max(40, Math.min(cupW - 2 * wallPx - 20, ((g.piezo_diameter_m || 0.018) / 0.02) * (cupW - 40)));
-    const glueH = 6;
+    const cov = Math.max(0.2, Math.min(1, Number(g.bond_coverage != null ? g.bond_coverage : (g.glue_coverage != null ? g.glue_coverage : 1))));
+    const glueW = Math.max(24, piezoW * Math.sqrt(cov));
+    const glueH = shape === "hemisphere" ? 7 : (shape === "cone" ? 6 : 6);
     const piezoH = 18;
+    const press = (g.glue_press || "medium");
+    const cure = Number(g.glue_cure_fraction != null ? g.glue_cure_fraction : 1);
     let html = "";
-    // PCB / handpiece
     html += `<rect x="${cupX + 20}" y="28" width="${cupW - 40}" height="36" rx="4" fill="#2a364a" stroke="#93a0b5"/>`;
     html += `<text x="${cupX + cupW / 2}" y="50" text-anchor="middle" fill="currentColor" font-size="12">PCB / Handstück</text>`;
-    // screws
     html += `<circle cx="${cupX + 40}" cy="100" r="5" fill="#8a9ba8"/><circle cx="${cupX + cupW - 40}" cy="100" r="5" fill="#8a9ba8"/>`;
     html += `<text x="${cupX + cupW / 2}" y="98" text-anchor="middle" fill="currentColor" font-size="10">${t("bowl.schematic_screws")}</text>`;
-    // Ti half-cup U-shape
     const innerL = cupX + wallPx;
     const innerR = cupX + cupW - wallPx;
     const bottomY = cupTop + cupH;
-    html += `<path d="M ${cupX} ${cupTop} L ${cupX} ${bottomY + bottomH} L ${cupX + cupW} ${bottomY + bottomH} L ${cupX + cupW} ${cupTop} L ${innerR} ${cupTop} L ${innerR} ${bottomY} L ${innerL} ${bottomY} L ${innerL} ${cupTop} Z" fill="#8a9ba8" stroke="#556" stroke-width="1.5"/>`;
+    const midX = cupX + cupW / 2;
+    // Ti wall + outer face profile by shape
+    let tiPath = "";
+    if (shape === "hemisphere") {
+      const rx = (cupW - 2 * wallPx) / 2;
+      const ry = Math.max(bottomH + 18, 28);
+      // outer U with hemispherical bottom
+      tiPath = `M ${cupX} ${cupTop} L ${cupX} ${bottomY} `
+        + `A ${cupW / 2} ${ry + wallPx * 0.3} 0 0 0 ${cupX + cupW} ${bottomY} `
+        + `L ${cupX + cupW} ${cupTop} L ${innerR} ${cupTop} L ${innerR} ${bottomY - 4} `
+        + `A ${rx} ${ry} 0 0 1 ${innerL} ${bottomY - 4} `
+        + `L ${innerL} ${cupTop} Z`;
+    } else if (shape === "cone") {
+      const tap = 18;
+      tiPath = `M ${cupX} ${cupTop} L ${cupX + tap * 0.35} ${bottomY + bottomH} L ${cupX + cupW - tap * 0.35} ${bottomY + bottomH} L ${cupX + cupW} ${cupTop} `
+        + `L ${innerR} ${cupTop} L ${innerR - tap * 0.2} ${bottomY} L ${innerL + tap * 0.2} ${bottomY} L ${innerL} ${cupTop} Z`;
+    } else {
+      // cup / Schale — mild concave outer bottom
+      const dip = 10;
+      tiPath = `M ${cupX} ${cupTop} L ${cupX} ${bottomY + bottomH - dip} `
+        + `Q ${midX} ${bottomY + bottomH + dip} ${cupX + cupW} ${bottomY + bottomH - dip} `
+        + `L ${cupX + cupW} ${cupTop} L ${innerR} ${cupTop} L ${innerR} ${bottomY} `
+        + `Q ${midX} ${bottomY + dip * 0.6} ${innerL} ${bottomY} L ${innerL} ${cupTop} Z`;
+    }
+    html += `<path d="${tiPath}" fill="#8a9ba8" stroke="#556" stroke-width="1.5"/>`;
     html += `<text x="${cupX + cupW + 12}" y="${cupTop + 20}" fill="currentColor" font-size="11">Ti ${t("bowl.schematic_wall")}</text>`;
-    html += `<text x="${cupX + cupW + 12}" y="${bottomY + bottomH / 2 + 4}" fill="currentColor" font-size="11">Ti ${t("bowl.schematic_bottom")}</text>`;
-    // piezo + glue inside bottom
+    html += `<text x="${cupX + cupW + 12}" y="${bottomY + 8}" fill="currentColor" font-size="11">Ti ${t("bowl.schematic_bottom")} (${t("bowl.ti_face_" + shape) || shape})</text>`;
+    // piezo + glue inside bottom (glue width reflects coverage)
     const pzX = cupX + (cupW - piezoW) / 2;
-    const glueY = bottomY - glueH - 1;
-    const pzY = glueY - piezoH;
+    const glueX = cupX + (cupW - glueW) / 2;
+    let glueY = bottomY - glueH - 1;
+    let pzY = glueY - piezoH;
+    if (shape === "hemisphere") {
+      glueY = bottomY - glueH - 8;
+      pzY = glueY - piezoH;
+    } else if (shape === "cone") {
+      glueY = bottomY - glueH - 2;
+      pzY = glueY - piezoH;
+    }
     html += `<rect x="${pzX}" y="${pzY}" width="${piezoW}" height="${piezoH}" fill="#e6a817" stroke="#0006" rx="2"/>`;
-    html += `<rect x="${pzX}" y="${glueY}" width="${piezoW}" height="${glueH}" fill="#c45c26" stroke="#0006"/>`;
+    // glue: islands → dashed segments
+    const scen = (g.glue_spread_scenario || "ideal");
+    if (scen === "islands" || cov < 0.75) {
+      const segs = 4;
+      const gap = 3;
+      const segW = (glueW - gap * (segs - 1)) / segs;
+      for (let i = 0; i < segs; i++) {
+        if (i % 2 === 1 && scen === "islands") continue;
+        html += `<rect x="${glueX + i * (segW + gap)}" y="${glueY}" width="${Math.max(2, segW)}" height="${glueH}" fill="#c45c26" stroke="#0006" opacity="${0.55 + 0.45 * cure}"/>`;
+      }
+    } else {
+      html += `<rect x="${glueX}" y="${glueY}" width="${glueW}" height="${glueH}" fill="#c45c26" stroke="#0006" opacity="${0.55 + 0.45 * cure}"/>`;
+    }
     html += `<text x="${pzX + piezoW / 2}" y="${pzY + 12}" text-anchor="middle" fill="#152033" font-size="10">PZT</text>`;
-    html += `<text x="${pzX + piezoW / 2}" y="${glueY + 5}" text-anchor="middle" fill="#fff" font-size="8">glue</text>`;
-    // wires: PCB → piezo, PCB → Ti wall
+    html += `<text x="${midX}" y="${glueY + 5}" text-anchor="middle" fill="#fff" font-size="8">glue</text>`;
+    // bond + shape annotations
+    html += `<text x="${cupX}" y="${cupTop - 8}" fill="var(--muted)" font-size="10">${t("bowl.schematic_bond")}: ${scen} · press=${press} · cure=${Math.round(cure * 100)}%</text>`;
+    // wires
     html += `<path d="M ${cupX + 55} 64 L ${cupX + 55} ${pzY + 4} L ${pzX + 8} ${pzY + 4}" fill="none" stroke="#3b9eff" stroke-width="2"/>`;
     html += `<text x="${cupX + 58}" y="${pzY - 6}" fill="#3b9eff" font-size="10">${t("bowl.schematic_wire_piezo")}</text>`;
     html += `<path d="M ${cupX + cupW - 55} 64 L ${cupX + cupW - 55} ${cupTop + 30} L ${cupX + cupW - 4} ${cupTop + 30}" fill="none" stroke="#2dd4a8" stroke-width="2"/>`;
     html += `<text x="${cupX + cupW - 52}" y="${cupTop + 24}" fill="#2dd4a8" font-size="10">${t("bowl.schematic_wire_ti")}</text>`;
-    // ultrasound arrows exiting outer face downward
-    const ax = cupX + cupW / 2;
-    const ay0 = bottomY + bottomH + 8;
+    // ultrasound arrows — converge for hemisphere, diverge slightly for cone
+    const ay0 = bottomY + bottomH + (shape === "hemisphere" ? 22 : 8);
     for (let i = 0; i < 5; i++) {
-      const x = ax - 40 + i * 20;
-      html += `<path d="M ${x} ${ay0} L ${x} ${ay0 + 28}" stroke="#3b9eff" stroke-width="2" marker-end="url(#arrow)"/>`;
+      const x0 = midX - 40 + i * 20;
+      let x1 = x0;
+      if (shape === "hemisphere") x1 = midX + (x0 - midX) * 0.45;
+      else if (shape === "cone") x1 = midX + (x0 - midX) * 1.25;
+      html += `<path d="M ${x0} ${ay0} L ${x1} ${ay0 + 28}" stroke="#3b9eff" stroke-width="2" marker-end="url(#arrow)"/>`;
     }
     html += `<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#3b9eff"/></marker></defs>`;
-    html += `<text x="${ax}" y="${ay0 + 48}" text-anchor="middle" fill="currentColor" font-size="11">${t("bowl.schematic_exit")}</text>`;
-    // gel/tissue band
+    html += `<text x="${midX}" y="${ay0 + 48}" text-anchor="middle" fill="currentColor" font-size="11">${t("bowl.schematic_exit")}</text>`;
     html += `<rect x="${cupX}" y="${ay0 + 52}" width="${cupW}" height="28" fill="#5dade288" stroke="#3498db"/>`;
-    html += `<text x="${ax}" y="${ay0 + 70}" text-anchor="middle" fill="currentColor" font-size="11">gel / tissue</text>`;
-    // droplet / mist educational cue
+    html += `<text x="${midX}" y="${ay0 + 70}" text-anchor="middle" fill="currentColor" font-size="11">gel / tissue</text>`;
     if (showDrop) {
-      html += `<circle cx="${ax + 55}" cy="${ay0 + 18}" r="7" fill="#5dade2" opacity="0.85"/>`;
-      html += `<circle cx="${ax + 62}" cy="${ay0 + 6}" r="3" fill="#a8d8ff" opacity="0.7"/>`;
-      html += `<circle cx="${ax + 48}" cy="${ay0 + 4}" r="2.5" fill="#a8d8ff" opacity="0.6"/>`;
-      html += `<text x="${ax + 78}" y="${ay0 + 12}" fill="currentColor" font-size="10">${t("bowl.schematic_mist")}</text>`;
+      html += `<circle cx="${midX + 55}" cy="${ay0 + 18}" r="7" fill="#5dade2" opacity="0.85"/>`;
+      html += `<circle cx="${midX + 62}" cy="${ay0 + 6}" r="3" fill="#a8d8ff" opacity="0.7"/>`;
+      html += `<circle cx="${midX + 48}" cy="${ay0 + 4}" r="2.5" fill="#a8d8ff" opacity="0.6"/>`;
+      html += `<text x="${midX + 78}" y="${ay0 + 12}" fill="currentColor" font-size="10">${t("bowl.schematic_mist")}</text>`;
     }
-    // stack legend (acoustic axis)
     let ly = 40;
     html += `<text x="420" y="28" fill="currentColor" font-size="13" font-weight="600">${t("bowl.schematic_axis")}</text>`;
     const solids = (layers || []).filter((l) => l.name !== "air");
-    solids.forEach((l) => {
-      const h = l.scale_group === "um" ? 18 : Math.max(20, Math.min(40, (l.thickness_m || 0) * 1e3 * 40));
-      html += `<rect x="420" y="${ly}" width="160" height="${h}" fill="${l.color_hint || "#888"}" stroke="#0006" rx="2"/>`;
-      html += `<text x="590" y="${ly + h / 2 + 4}" fill="currentColor" font-size="11">${l.name} · ${l.thickness_display || ""}</text>`;
-      ly += h + 4;
-    });
+    if (solids.length) {
+      solids.forEach((l) => {
+        const h = l.scale_group === "um" ? 18 : Math.max(20, Math.min(40, (l.thickness_m || 0) * 1e3 * 40));
+        html += `<rect x="420" y="${ly}" width="160" height="${h}" fill="${l.color_hint || "#888"}" stroke="#0006" rx="2"/>`;
+        html += `<text x="590" y="${ly + h / 2 + 4}" fill="currentColor" font-size="11">${l.name} · ${l.thickness_display || ""}</text>`;
+        ly += h + 4;
+      });
+    } else {
+      html += `<text x="420" y="${ly + 14}" fill="var(--muted)" font-size="11">${t("bowl.schematic_live_hint")}</text>`;
+      ly += 28;
+    }
     html += `<text x="420" y="${ly + 18}" fill="var(--muted)" font-size="10">${t("bowl.schematic_note")}</text>`;
+    html += `<text x="420" y="${ly + 34}" fill="var(--muted)" font-size="10">${t("bowl.schematic_shape_note")}</text>`;
     svg.innerHTML = html;
     const cap = $("bowlDropletCaption");
     if (cap) cap.style.display = showDrop ? "block" : "none";
   }
-
-
 
   function energyParts(energy) {
     const e = energy || {};
@@ -959,7 +1012,8 @@
       $("bowlEta").textContent = ((energy.efficiency ?? 0) * 100).toFixed(1) + " %";
       if ($("bowlTof") && result.time_of_flight) $("bowlTof").textContent = (result.time_of_flight.total_ns || 0).toFixed(1) + " ns";
       if ($("bowlLam")) $("bowlLam").textContent = result.lambda_m ? (result.lambda_m * 1e3).toFixed(3) + " mm" : "—";
-      drawSchematic(result.layers || [], result.geometry || result.params || {});
+      drawSchematic(result.layers || [], Object.assign({}, result.geometry || {}, result.params || {}));
+      applyWavePathStrip(result.wave_path || (result.geometry && result.geometry.wave_path));
       try {
         bowlEnergyCache.start = cloneEnergyParts(energy);
         bowlEnergyCache.end = cloneEnergyParts(energy);
@@ -1253,10 +1307,71 @@
     out.textContent = String(el.value) + " %";
   }
 
+
+  function geometryFromForm() {
+    const mmOr = (id, def) => {
+      const el = $(id);
+      const v = el ? parseFloat(el.value) : NaN;
+      return isFinite(v) ? v : def;
+    };
+    const covPct = parseFloat(($("bowlGlueCoverage") || { value: 100 }).value) || 100;
+    const curePct = parseFloat(($("bowlGlueCure") || { value: 100 }).value) || 100;
+    return {
+      cup_depth_m: mmOr("bowlCupDepth", 4) * 1e-3,
+      cup_wall_thickness_m: mmOr("bowlCupWall", 0.52) * 1e-3,
+      ti_bottom_thickness_m: mmOr("bowlTiH", 0.3) * 1e-3,
+      piezo_diameter_m: mmOr("bowlPiezoD", 18) * 1e-3,
+      ti_face_shape: (($("bowlTiFaceShapeVal") || { value: "cup" }).value || "cup"),
+      glue_spread_scenario: (($("bowlGlueSpreadScenario") || { value: "ideal" }).value || "ideal"),
+      glue_coverage: Math.max(0.2, Math.min(1, covPct / 100)),
+      bond_coverage: Math.max(0.2, Math.min(1, covPct / 100)),
+      glue_press: (($("bowlGluePress") || { value: "medium" }).value || "medium"),
+      glue_cure_fraction: Math.max(0, Math.min(1, curePct / 100)),
+      load: (($("bowlLoad") || { value: "gel_tissue" }).value || "gel_tissue"),
+      drive_level: parseFloat(($("bowlDrive") || { value: 1 }).value) || 1,
+      droplet_demo: !!($("bowlDroplet") && $("bowlDroplet").checked),
+    };
+  }
+
+  function refreshSchematicLive() {
+    drawSchematic([], geometryFromForm());
+  }
+
+  function setTiFaceShape(key, updateHint) {
+    const k = key || "cup";
+    if ($("bowlTiFaceShapeVal")) $("bowlTiFaceShapeVal").value = k;
+    document.querySelectorAll("#bowlTiFaceShape .preset-chip").forEach((b) => {
+      b.classList.toggle("active", b.dataset.tiFaceShape === k);
+    });
+    const hint = $("bowlTiFaceShapeHint");
+    if (hint && updateHint !== false) {
+      const i18nKey = "bowl.ti_face_hint_" + k;
+      hint.setAttribute("data-i18n", i18nKey);
+      hint.textContent = t(i18nKey);
+    }
+    refreshSchematicLive();
+  }
+
+  function applyWavePathStrip(wp) {
+    if (!wp) return;
+    const shapeKey = wp.ti_face_shape || "cup";
+    if ($("bowlWaveShape")) $("bowlWaveShape").textContent = t("bowl.ti_face_" + shapeKey) || shapeKey;
+    if ($("bowlWaveT")) $("bowlWaveT").textContent = (wp.t_at_f0 != null ? Number(wp.t_at_f0).toFixed(4) : "—");
+    if ($("bowlWaveLossGlue")) $("bowlWaveLossGlue").textContent = (wp.loss_glue != null ? (Number(wp.loss_glue) * 100).toFixed(1) + " %" : "—");
+    if ($("bowlWavePac")) $("bowlWavePac").textContent = (wp.p_ac_w != null ? Number(wp.p_ac_w).toFixed(3) + " W" : "—");
+    if ($("bowlWaveZFocus")) $("bowlWaveZFocus").textContent = (wp.z_focus_mm != null ? Number(wp.z_focus_mm).toFixed(2) + " mm" : "—");
+  }
+
   function setGlueSpreadScenario(key, updateHint) {
     const k = key || "ideal";
     if ($("bowlGlueSpreadScenario")) $("bowlGlueSpreadScenario").value = k;
-    document.querySelectorAll("#bowlGlueSpread .preset-chip").forEach((b) => {
+    document.querySelectorAll("#bowlTiFaceShape .preset-chip").forEach((b) => {
+    b.addEventListener("click", () => {
+      setTiFaceShape(b.dataset.tiFaceShape, true);
+      // diagram only — no auto full-analyze
+    });
+  });
+  document.querySelectorAll("#bowlGlueSpread .preset-chip").forEach((b) => {
       b.classList.toggle("active", b.dataset.glueSpread === k);
     });
     const hint = $("bowlGlueSpreadHint");
@@ -1419,7 +1534,16 @@
     chartTheme();
     resizeAllCharts();
   });
-  $("modelSelect").addEventListener("change", async () => { await applySettings(); await loadPrograms(); });
+  $("modelSelect").addEventListener("change", async () => {
+    const card = $("ldmTyp16Card");
+    if (card) card.hidden = $("modelSelect").value !== "LDM_TRIPLE";
+    await applySettings();
+    await loadPrograms();
+  });
+  // initial LDM stub card
+  if ($("ldmTyp16Card") && $("modelSelect")) {
+    $("ldmTyp16Card").hidden = $("modelSelect").value !== "LDM_TRIPLE";
+  }
   $("programSelect").addEventListener("change", onProgramChange);
   $("btnApply").addEventListener("click", applySettings);
   $("btnWrite").addEventListener("click", applySettings);
@@ -1527,6 +1651,7 @@
   document.querySelectorAll("#bowlGlueSpread .preset-chip").forEach((b) => {
     b.addEventListener("click", () => {
       setGlueSpreadScenario(b.dataset.glueSpread, true);
+      refreshSchematicLive();
       // No auto-analyze — user presses Analysieren or Energie neu berechnen
     });
   });
@@ -1546,6 +1671,7 @@
   setGlueSpreadScenario((($("bowlGlueSpreadScenario") || {}).value) || "ideal", true);
   setGluePress((($("bowlGluePress") || {}).value) || "medium", true);
   setGlueCure((($("bowlGlueCure") || {}).value) || 100, true);
+  setTiFaceShape((($("bowlTiFaceShapeVal") || {}).value) || "cup", true);
   $("btnBowlReset").addEventListener("click", resetBowl);
   if ($("bowlDurationPreset")) {
     $("bowlDurationPreset").addEventListener("change", syncBowlDurationUI);

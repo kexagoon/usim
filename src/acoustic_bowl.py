@@ -140,6 +140,9 @@ class BowlParams:
     glue_press: str = "medium"
     # Cure / drying degree 0…1 (1 = fully cured). Also accepts UI % / named chips.
     glue_cure_fraction: float = 1.0
+    # Titanium face / cup outer profile (CALIBRATION_PRESET geometry)
+    # cup | cone | hemisphere — Schale / leicht konisch / Halbkugel
+    ti_face_shape: str = "cup"
 
     def resolved_piezo_thickness(self, c_pzt: float) -> float:
         if self.piezo_thickness_m is not None and self.piezo_thickness_m > 0:
@@ -344,12 +347,27 @@ def params_help(cfg: dict[str, Any] | None = None) -> dict[str, Any]:
             }
             for k in GLUE_SPREAD_SCENARIOS
         },
+        "ti_face_shapes": list(TI_FACE_SHAPES),
+        "ti_face_shape_defaults": {
+            k: {
+                "h_ti_mul": resolve_ti_face_shape(k).h_ti_mul,
+                "z_focus_mul": resolve_ti_face_shape(k).z_focus_mul,
+                "focus_gain": resolve_ti_face_shape(k).focus_gain,
+                "era_eff_mul": resolve_ti_face_shape(k).era_eff_mul,
+                "beam_width_mul": resolve_ti_face_shape(k).beam_width_mul,
+                "coupling_mul": resolve_ti_face_shape(k).coupling_mul,
+                "path_edge_mul": resolve_ti_face_shape(k).path_edge_mul,
+                "w_ti_mul": resolve_ti_face_shape(k).w_ti_mul,
+            }
+            for k in TI_FACE_SHAPES
+        },
         "geometry_keys": [
             "cup_inner_diameter_m",
             "cup_outer_diameter_m",
             "cup_wall_thickness_m",
             "cup_depth_m",
             "ti_thickness_m",
+            "ti_face_shape",
             "piezo_diameter_m",
             "glue_thickness_m",
         ],
@@ -621,6 +639,85 @@ def bond_factors_from_params(p: Any) -> GlueSpreadFactors:
     )
 
 
+TI_FACE_SHAPES = ("cup", "cone", "hemisphere")
+
+
+@dataclass(frozen=True)
+class TiFaceShapeFactors:
+    """Educational geometric factors for Ti face profile (CALIBRATION_PRESET).
+
+    cup = shallow concave half-cup baseline; cone = slight taper / longer edge path;
+    hemisphere = stronger spherical focusing. Not FEM / hydrophone metrology.
+    """
+
+    key: str
+    h_ti_mul: float          # axis-effective Ti path length vs nominal h_Ti
+    z_focus_mul: float       # focus depth vs piston z_n (<1 earlier)
+    focus_gain: float        # on-axis peak gain
+    era_eff_mul: float       # mild effective ERA / area coupling
+    beam_width_mul: float    # radial beam width (>1 wider)
+    coupling_mul: float      # mild stack coupling / T_I path
+    path_edge_mul: float     # Ti wall path at rim vs axis (annotation / mild loss)
+    w_ti_mul: float          # energy weight toward Ti heating
+
+
+def normalize_ti_face_shape(shape: str | None) -> str:
+    key = (shape or "cup").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "schale": "cup",
+        "napf": "cup",
+        "bowl": "cup",
+        "half_cup": "cup",
+        "halfcup": "cup",
+        "чашка": "cup",
+        "chashka": "cup",
+        "konisch": "cone",
+        "leicht_konisch": "cone",
+        "conical": "cone",
+        "конус": "cone",
+        "konus": "cone",
+        "halbkugel": "hemisphere",
+        "sphere": "hemisphere",
+        "spherical": "hemisphere",
+        "dome": "hemisphere",
+        "полусфера": "hemisphere",
+        "polusfera": "hemisphere",
+    }
+    key = aliases.get(key, key)
+    return key if key in TI_FACE_SHAPES else "cup"
+
+
+def resolve_ti_face_shape(shape: str | None) -> TiFaceShapeFactors:
+    """Map Ti face shape → geometric / field / coupling multipliers."""
+    key = normalize_ti_face_shape(shape)
+    table = {
+        # Mild focusing shallow concave — current half-cup baseline
+        "cup": dict(
+            h_ti_mul=1.0, z_focus_mul=0.92, focus_gain=1.06,
+            era_eff_mul=1.0, beam_width_mul=1.0, coupling_mul=1.0,
+            path_edge_mul=1.06, w_ti_mul=1.0,
+        ),
+        # Slightly conical: longer edge path, focus farther, wider beam, mild T_I drop
+        "cone": dict(
+            h_ti_mul=1.08, z_focus_mul=1.18, focus_gain=0.90,
+            era_eff_mul=0.97, beam_width_mul=1.14, coupling_mul=0.96,
+            path_edge_mul=1.22, w_ti_mul=1.12,
+        ),
+        # Hemisphere / strong curvature: earlier focus, higher on-axis peak, narrower beam
+        "hemisphere": dict(
+            h_ti_mul=1.14, z_focus_mul=0.52, focus_gain=1.38,
+            era_eff_mul=0.93, beam_width_mul=0.78, coupling_mul=0.94,
+            path_edge_mul=1.48, w_ti_mul=1.22,
+        ),
+    }
+    d = table[key]
+    return TiFaceShapeFactors(key=key, **d)
+
+
+def ti_shape_factors_from_params(p: Any) -> TiFaceShapeFactors:
+    return resolve_ti_face_shape(getattr(p, "ti_face_shape", "cup"))
+
+
 class AcousticBowl:
     """Multilayer transfer-matrix bowl simulator."""
 
@@ -728,12 +825,28 @@ class AcousticBowl:
         # Optional backing behind piezo (affects bandwidth via energy model; shown in schematic)
         if p.backing == "heavy":
             layers.append(BowlLayer("backing", mats["backing"], 0.002, d_piezo))
+        sf = ti_shape_factors_from_params(p)
+        # Transfer-matrix phase uses nominal bottom thickness (1D). Shape path stretch
+        # is applied in energy_partition (loss_ti / coupling) + near_field focus — not
+        # as a large h_Ti phase jump (would dominate λ-interference at 10–19 MHz).
+        # Mild educational α bump for longer curved path encoded via Material below.
+        ti_src = mats["titanium"]
+        path_attn = 1.0 + 0.35 * max(0.0, sf.path_edge_mul - 1.0)
+        ti_mat = Material(
+            ti_src.name,
+            ti_src.rho_kg_m3,
+            ti_src.c_m_s,
+            ti_src.z_mrayl,
+            ti_src.attenuation_np_m_mhz * path_attn,
+            ti_src.key,
+            ti_src.kt,
+        )
         layers.extend(
             [
                 BowlLayer("pzt", mats["pzt"], h_pzt, d_piezo),
                 BowlLayer("glue", glue_mat, h_glue, d_glue),
                 # Ti bottom of half-cup — primary radiating wall (outer face → load)
-                BowlLayer("ti_bottom", mats["titanium"], p.ti_thickness_m, d_outer),
+                BowlLayer("ti_bottom", ti_mat, p.ti_thickness_m, d_outer),
             ]
         )
         if p.matching_enabled:
@@ -759,18 +872,32 @@ class AcousticBowl:
 
     def geometry_meta(self) -> dict[str, Any]:
         p = self.params
+        sf = ti_shape_factors_from_params(p)
+        gs = bond_factors_from_params(p)
         return {
             "cup_inner_diameter_m": p.cup_inner_diameter_m,
             "cup_outer_diameter_m": p.cup_outer_diameter_m,
             "cup_wall_thickness_m": p.cup_wall_thickness_m,
             "cup_depth_m": p.cup_depth_m,
             "ti_bottom_thickness_m": p.ti_thickness_m,
+            "ti_face_shape": sf.key,
+            "ti_face_shape_factors": {
+                "h_ti_mul": sf.h_ti_mul,
+                "z_focus_mul": sf.z_focus_mul,
+                "focus_gain": sf.focus_gain,
+                "era_eff_mul": sf.era_eff_mul,
+                "beam_width_mul": sf.beam_width_mul,
+                "coupling_mul": sf.coupling_mul,
+                "path_edge_mul": sf.path_edge_mul,
+                "w_ti_mul": sf.w_ti_mul,
+            },
             "piezo_diameter_m": p.piezo_diameter_m,
             "glue_thickness_m": p.glue_thickness_m,
             "glue_spread_scenario": getattr(p, "glue_spread_scenario", "ideal"),
             "glue_coverage": getattr(p, "glue_coverage", 1.0),
             "glue_press": getattr(p, "glue_press", "medium"),
             "glue_cure_fraction": float(getattr(p, "glue_cure_fraction", 1.0) or 1.0),
+            "bond_coverage": gs.coverage,
             "pcb_drive_v": p.pcb_drive_v,
             "p_elec_max_w": p.p_elec_max_w,
             "r_wire_piezo_ohm": p.r_wire_piezo_ohm,
@@ -782,7 +909,8 @@ class AcousticBowl:
                 ly.name for ly in self.build_layers() if ly.name != "backing"
             ],
             "note": (
-                "1D axis: piezo→glue→Ti bottom→load; side walls = Ti return electrode"
+                "1D axis: piezo→glue→Ti bottom→load; side walls = Ti return electrode; "
+                "ti_face_shape scales path/focus (CALIBRATION)"
             ),
         }
 
@@ -958,8 +1086,10 @@ class AcousticBowl:
 
         h_glue = p.glue_thickness_m
         h_pzt = p.resolved_piezo_thickness(mats["pzt"].c_m_s)
-        h_ti = p.ti_thickness_m
         gs = bond_factors_from_params(p)
+        sf = ti_shape_factors_from_params(p)
+        # Mild path-length stretch for absorption only (not full phase thickness)
+        h_ti = p.ti_thickness_m * (1.0 + 0.35 * (sf.h_ti_mul - 1.0))
         glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
         glue_scale = max(0.2, min(5.0, glue_scale)) * gs.attn_mul
         glue_scale = max(0.2, min(5.0, glue_scale))
@@ -969,7 +1099,8 @@ class AcousticBowl:
         h_glue_eff = h_glue * gs.h_eff_mul
         loss_glue = 1.0 - math.exp(-4.0 * alpha_glue * h_glue_eff)
         loss_pzt = 1.0 - math.exp(-4.0 * alpha_pzt * h_pzt)
-        loss_ti = 1.0 - math.exp(-4.0 * alpha_ti * h_ti)
+        # Edge-path stretch (cone/hemisphere) adds mild extra Ti attenuation
+        loss_ti = 1.0 - math.exp(-4.0 * alpha_ti * h_ti * (0.7 + 0.3 * sf.path_edge_mul))
         lam_glue = mats["glue"].c_m_s / f
         mismatch_extra = min(0.85, (h_glue_eff / max(lam_glue, 1e-9)) * 8.0 * gs.mismatch_mul)
 
@@ -977,6 +1108,7 @@ class AcousticBowl:
         ref_params.glue_thickness_m = 1e-6
         ref_params.glue_spread_scenario = "ideal"
         ref_params.glue_coverage = 1.0
+        ref_params.ti_face_shape = "cup"
         ref_bowl = AcousticBowl(ref_params, self.cfg)
         t_ref, _, _ = ref_bowl.transmission_reflection(f)
         t_ref = max(t_ref, 1e-12)
@@ -986,19 +1118,19 @@ class AcousticBowl:
         # Heavy backing absorbs some drive energy (broader BW trade-off)
         if p.backing == "heavy":
             absorbed = min(0.98, absorbed + 0.08)
-        coupling = max(0.0, t_rel * (1.0 - absorbed) * gs.coverage)
+        coupling = max(0.0, t_rel * (1.0 - absorbed) * gs.coverage * sf.coupling_mul)
         coupling = min(1.0, coupling)
 
-        # Area scaling: smaller piezo → less radiated power; coverage reduces effective ERA share
+        # Area scaling: smaller piezo → less radiated power; coverage + shape ERA
         area_ratio = (math.pi * (min(p.piezo_diameter_m, p.ti_diameter_m) / 2) ** 2) / ERA_M2
-        area_ratio = float(np.clip(area_ratio * gs.coverage, 0.15, 1.2))
+        area_ratio = float(np.clip(area_ratio * gs.coverage * sf.era_eff_mul, 0.15, 1.2))
 
         elec_eff = self.electrode_efficiency()
         p_rad = min(P_AC_MAX_W, p_drive * stack_eff * coupling * area_ratio * elec_eff)
         remain = max(0.0, p_drive - p_rad)
         w_glue = (0.20 + mismatch_extra) * (0.7 + 0.3 * glue_scale) * gs.w_glue_mul
         w_pzt = 0.70 * gs.w_pzt_mul
-        w_ti = 0.10 * gs.w_ti_mul
+        w_ti = 0.10 * gs.w_ti_mul * sf.w_ti_mul
         w_sum = w_glue + w_pzt + w_ti
         eff = p_rad / p_drive if p_drive > 0 else 0.0
         return EnergyPartition(
@@ -1264,35 +1396,55 @@ class AcousticBowl:
     ) -> dict[str, Any]:
         p = self.params
         f = p.f0_hz
+        sf = ti_shape_factors_from_params(p)
         a = p.ti_diameter_m / 2.0
         lam = wavelength_m(f, C_TISSUE)
         zn = (a * a) / lam
+        z_focus = zn * sf.z_focus_mul
         if z_max_m is None:
-            z_max_m = max(2.0 * zn, 0.008)
+            z_max_m = max(2.0 * max(zn, z_focus), 0.008)
         e = self.energy_partition()
         i0 = e.p_radiated_w / max(p.era_cm2, 1e-9)
         i0 = min(i0, I_MAX_W_CM2)
+        # Geometric focusing gain (educational) — capped vs I_max
+        i0_peak = min(i0 * sf.focus_gain, I_MAX_W_CM2 * 1.8)
 
         z = np.linspace(lam * 0.1, z_max_m, nx)
-        r = np.linspace(0.0, a * 1.2, nr)
+        a_beam = a * sf.beam_width_mul
+        r = np.linspace(0.0, max(a_beam, a) * 1.2, nr)
         zz, rr = np.meshgrid(z, r, indexing="xy")
-        s = np.sqrt(zz**2 + a**2) - zz
+        # Stretch z so piston last-max aligns near z_focus (shape-dependent)
+        z_stretch = max(sf.z_focus_mul, 0.25)
+        zz_eff = zz / z_stretch
+        s = np.sqrt(zz_eff**2 + a**2) - zz_eff
         on_axis = np.sin(math.pi / lam * s) ** 2
         peak = float(np.max(on_axis)) or 1.0
         on_axis = on_axis / peak
-        radial = np.exp(-((rr / a) ** 2))
+        radial = np.exp(-((rr / max(a_beam, 1e-9)) ** 2))
         x_half = half_value_depth_m(f)
         alpha = math.log(2.0) / (2.0 * x_half)
         depth = np.exp(-2.0 * alpha * zz)
-        field = i0 * on_axis * radial * depth
+        field = i0_peak * on_axis * radial * depth
+        # On-axis peak location for wave-path KPI
+        axis = field[0] if field.shape[0] else on_axis.flatten()
+        if hasattr(axis, "__len__") and len(axis):
+            z_peak_mm = float(z[int(np.argmax(axis))] * 1e3)
+        else:
+            z_peak_mm = float(z_focus * 1e3)
         return {
             "z_mm": (z * 1e3).tolist(),
             "r_mm": (r * 1e3).tolist(),
             "i_w_cm2": field.tolist(),
             "z_n_mm": zn * 1e3,
+            "z_focus_mm": z_focus * 1e3,
+            "z_peak_mm": z_peak_mm,
+            "focus_gain": sf.focus_gain,
+            "ti_face_shape": sf.key,
             "lambda_mm": lam * 1e3,
             "i0_w_cm2": i0,
+            "i0_peak_w_cm2": i0_peak,
             "a_mm": a * 1e3,
+            "a_beam_mm": a_beam * 1e3,
             "x_half_mm": x_half * 1e3,
         }
 
@@ -1336,6 +1488,60 @@ class AcousticBowl:
             )
         return out
 
+    def wave_path_summary(self) -> dict[str, Any]:
+        """Acoustics-first strip: US → glue bond → Ti shape → radiated field."""
+        p = self.params
+        f0 = p.f0_hz
+        gs = bond_factors_from_params(p)
+        sf = ti_shape_factors_from_params(p)
+        layers = self.build_layers()
+        t_i, r_i, _ = self.transmission_reflection(f0, layers)
+        e = self.energy_partition(f0)
+        mats = self._materials()
+        glue_scale = float(getattr(p, "glue_attn_scale", 1.0) or 1.0)
+        glue_scale = max(0.2, min(5.0, glue_scale)) * gs.attn_mul
+        alpha_glue = mats["glue"].attenuation_np_m_mhz * glue_scale * (f0 / 1e6)
+        h_glue_eff = p.glue_thickness_m * gs.h_eff_mul
+        loss_glue = 1.0 - math.exp(-4.0 * alpha_glue * h_glue_eff)
+        a = p.ti_diameter_m / 2.0
+        lam = wavelength_m(f0, C_TISSUE)
+        zn = (a * a) / lam
+        z_focus = zn * sf.z_focus_mul
+        h_ti_layer = next((ly.thickness_m for ly in layers if ly.name == "ti_bottom"), p.ti_thickness_m)
+        h_ti_eff = h_ti_layer * (1.0 + 0.35 * (sf.h_ti_mul - 1.0))
+        return {
+            "calibration": True,
+            "chain": "piezo → glue(bond) → Ti(shape) → load",
+            "ti_face_shape": sf.key,
+            "t_at_f0": float(t_i),
+            "r_at_f0": float(r_i),
+            "loss_glue": float(loss_glue),
+            "p_ac_w": float(e.p_radiated_w),
+            "efficiency": float(e.efficiency),
+            "z_n_mm": float(zn * 1e3),
+            "z_focus_mm": float(z_focus * 1e3),
+            "focus_gain": float(sf.focus_gain),
+            "h_ti_eff_mm": float(h_ti_eff * 1e3),
+            "bond": {
+                "scenario": gs.key,
+                "coverage": gs.coverage,
+                "press": gs.press,
+                "cure_fraction": gs.cure_fraction,
+                "attn_mul": gs.attn_mul,
+                "mismatch_mul": gs.mismatch_mul,
+                "h_eff_mul": gs.h_eff_mul,
+            },
+            "shape": {
+                "h_ti_mul": sf.h_ti_mul,
+                "z_focus_mul": sf.z_focus_mul,
+                "focus_gain": sf.focus_gain,
+                "era_eff_mul": sf.era_eff_mul,
+                "beam_width_mul": sf.beam_width_mul,
+                "coupling_mul": sf.coupling_mul,
+                "path_edge_mul": sf.path_edge_mul,
+            },
+        }
+
     def analyze(self) -> BowlResult:
         p = self.params
         f0 = p.f0_hz
@@ -1366,6 +1572,7 @@ class AcousticBowl:
                 "cup_outer_diameter_m": p.cup_outer_diameter_m,
                 "cup_wall_thickness_m": p.cup_wall_thickness_m,
                 "cup_depth_m": p.cup_depth_m,
+                "ti_face_shape": normalize_ti_face_shape(getattr(p, "ti_face_shape", "cup")),
                 "piezo_diameter_m": p.piezo_diameter_m,
                 "glue_thickness_m": p.glue_thickness_m,
                 "glue_attn_scale": float(getattr(p, "glue_attn_scale", 1.0) or 1.0),
@@ -1439,6 +1646,7 @@ class AcousticBowl:
             "lambda_m": r.lambda_m,
             "x_half_m": r.half_value_m,
             "geometry": self.geometry_meta(),
+            "wave_path": self.wave_path_summary(),
             "anchors": {
                 "era_cm2": ERA_CM2,
                 "i_max_w_cm2": I_MAX_W_CM2,
@@ -1495,6 +1703,7 @@ def bowl_params_from_dict(
         "glue_coverage": float,
         "glue_press": str,
         "glue_cure_fraction": float,
+        "ti_face_shape": str,
     }
     for key, caster in mapping.items():
         if key in data and data[key] is not None:
@@ -1563,6 +1772,7 @@ def bowl_params_from_dict(
     p.glue_coverage = float(np.clip(float(getattr(p, "glue_coverage", 1.0) or 1.0), 0.2, 1.0))
     p.glue_press = normalize_glue_press(getattr(p, "glue_press", "medium"))
     p.glue_cure_fraction = normalize_glue_cure(getattr(p, "glue_cure_fraction", 1.0))
+    p.ti_face_shape = normalize_ti_face_shape(getattr(p, "ti_face_shape", "cup"))
     p.f0_hz = validate_f0(p.f0_hz)
     if p.backing not in ("air", "heavy"):
         p.backing = "air"

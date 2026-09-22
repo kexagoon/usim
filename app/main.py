@@ -26,6 +26,8 @@ from src.acoustic_bowl import (
     default_bowl_params,
     params_help,
     resolve_glue_spread,
+    resolve_ti_face_shape,
+    ti_shape_factors_from_params,
 )
 from src.bowl_transient import (
     default_thermal_params,
@@ -53,9 +55,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.3.3-bond-wide",
-            "usim_build": _os.environ.get("USIM_BUILD", "bond-press-cure-wide-2026-09-22"),
-            "note": "Energy bar recreate anti-freeze; glue press+cure+spread→all acoustic charts; fullscreen wide data; default Akustik-Schale; 2026-09-22",
+            "version": "1.3.4-ti-shape",
+            "usim_build": _os.environ.get("USIM_BUILD", "ti-shape-wave-2026-09-22"),
+            "note": "Ti face shape cup/cone/hemisphere→path/focus/energy; wave-path strip; bond+shape schematic; 2026-09-22",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -431,6 +433,7 @@ class BowlParamsIn(BaseModel):
     glue_coverage: float | None = None
     glue_press: str | None = None
     glue_cure_fraction: float | None = None
+    ti_face_shape: str | None = None
     # Thermal / transient calib (applied on Analysieren with other settings)
     t_amb_c: float | None = None
     t_warn_c: float | None = None
@@ -831,7 +834,20 @@ async def api_bowl_energy_post(body: BowlEnergyIn | None = None) -> dict[str, An
             "glue_cure_fraction": getattr(bowl.params, "glue_cure_fraction", 1.0),
             "glue_thickness_m": bowl.params.glue_thickness_m,
             "glue_attn_scale": getattr(bowl.params, "glue_attn_scale", 1.0),
+            "ti_face_shape": getattr(bowl.params, "ti_face_shape", "cup"),
         },
+        "ti_face_shape": (lambda _sf: {
+            "key": _sf.key,
+            "h_ti_mul": _sf.h_ti_mul,
+            "z_focus_mul": _sf.z_focus_mul,
+            "focus_gain": _sf.focus_gain,
+            "era_eff_mul": _sf.era_eff_mul,
+            "beam_width_mul": _sf.beam_width_mul,
+            "coupling_mul": _sf.coupling_mul,
+            "path_edge_mul": _sf.path_edge_mul,
+            "w_ti_mul": _sf.w_ti_mul,
+        })(ti_shape_factors_from_params(bowl.params)),
+        "wave_path": bowl.wave_path_summary(),
         "thermal": _asdict(_bowl_thermal),
         "transient_summary": transient_summary,
     }

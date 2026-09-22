@@ -363,6 +363,12 @@
           </div>
         </details>
 
+
+        <div class="card clinical-stub-card" id="ldmTyp16Card" hidden>
+          <strong class="card-title" data-i18n="therapy.ldm_typ16_title">Typ 16 TRIPLE (Foto)</strong>
+          <span class="badge calib" data-i18n="app.calibration_badge">Kalibrierung</span>
+          <p class="hint" data-i18n="therapy.ldm_typ16_note"></p>
+        </div>
         <div class="contraindications-note">
           <strong class="card-title" data-i18n="panels.contraindications">{{ i18n.panels.contraindications }}</strong>
           <p class="hint" data-i18n="contraindications.hint">{{ i18n.contraindications.hint }}</p>
@@ -572,6 +578,22 @@
                 <input type="number" id="bowlCupDepth" min="1" max="15" step="0.5" value="4" />
                 <small class="help" data-i18n="bowl.help_cup_depth"></small>
               </label>
+
+              <div class="glue-spread-block" id="bowlTiFaceShapeBlock">
+                <div class="label-row glue-spread-head">
+                  <span data-i18n="bowl.ti_face_shape">Titan-Form (Strahlerfläche)</span>
+                  <span class="info" data-i18n-title="bowl.help_ti_face_shape" title="">?</span>
+                  <span class="badge calib" data-i18n="app.calibration_badge">Kalibrierung</span>
+                </div>
+                <div class="preset-chips glue-spread-chips" id="bowlTiFaceShape" role="group" aria-label="Titanium face shape">
+                  <button type="button" class="preset-chip active" data-ti-face-shape="cup" data-i18n="bowl.ti_face_cup">Schale / Napf</button>
+                  <button type="button" class="preset-chip" data-ti-face-shape="cone" data-i18n="bowl.ti_face_cone">Leicht konisch</button>
+                  <button type="button" class="preset-chip" data-ti-face-shape="hemisphere" data-i18n="bowl.ti_face_hemisphere">Halbkugel</button>
+                </div>
+                <input type="hidden" id="bowlTiFaceShapeVal" value="cup" />
+                <p class="help glue-spread-help" data-i18n="bowl.help_ti_face_shape"></p>
+                <p class="hint muted" id="bowlTiFaceShapeHint" data-i18n="bowl.ti_face_hint_cup"></p>
+              </div>
               <label><span class="label-row"><span data-i18n="bowl.piezo_h">Piezo thickness (mm)</span>
                 <span class="info" data-i18n-title="bowl.help_piezo" title="">?</span></span>
                 <input type="number" id="bowlPiezoH" min="0.05" max="2.5" step="0.005" value="" placeholder="auto λ/2" />
@@ -877,6 +899,15 @@
           <p class="hint" data-i18n="bowl.dual_scale"></p>
           <svg id="bowlSvg" viewBox="0 0 720 420" class="bowl-svg" role="img"></svg>
           <p class="caption" id="bowlDropletCaption" data-i18n="bowl.caption_droplet"></p>
+
+          <div class="kpi-strip kpi-wave-path" id="bowlWavePathStrip" aria-live="polite">
+            <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.wave_path_title">Wellenpfad</span><b id="bowlWaveShape">—</b></div>
+            <div class="kpi-item"><span class="kpi-label">T</span><b id="bowlWaveT">—</b></div>
+            <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.wave_loss_glue">Verlust Kleber</span><b id="bowlWaveLossGlue">—</b></div>
+            <div class="kpi-item"><span class="kpi-label">P_ac</span><b id="bowlWavePac">—</b></div>
+            <div class="kpi-item"><span class="kpi-label" data-i18n="bowl.wave_z_focus">z_focus</span><b id="bowlWaveZFocus">—</b></div>
+          </div>
+          <p class="hint muted" id="bowlWavePathNote" data-i18n="bowl.wave_path_note"></p>
         </section>
 
         <div class="chart-grid">

@@ -21,7 +21,7 @@ RUN chmod +x docker-entrypoint.sh
 ENV PYTHONPATH=/app
 ENV HOST=0.0.0.0
 ENV PORT=8765
-ENV USIM_BUILD=bond-press-cure-wide-2026-09-22
+ENV USIM_BUILD=ti-shape-wave-2026-09-22
 EXPOSE 8765
 
 CMD ["./docker-entrypoint.sh"]
