@@ -36,7 +36,12 @@ from src.bowl_transient import (
     thermal_help,
     thermal_params_from_dict,
 )
-from src.frequencies import ALLOWED_F0_HZ, frequency_policy_dict, validate_f0
+from src.frequencies import (
+    ALLOWED_F0_HZ,
+    COMPARE_ANCHOR_F0_HZ,
+    frequency_policy_dict,
+    validate_f0,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 APP_DIR = Path(__file__).resolve().parent
@@ -55,9 +60,9 @@ async def api_build() -> JSONResponse:
     text = tpl.read_text(encoding="utf-8") if tpl.exists() else ""
     return JSONResponse(
         {
-            "version": "1.3.4-ti-shape",
-            "usim_build": _os.environ.get("USIM_BUILD", "ti-shape-wave-2026-09-22"),
-            "note": "Ti face shape cup/cone/hemisphere→path/focus/energy; wave-path strip; bond+shape schematic; 2026-09-22",
+            "version": "1.3.5-freq-compare",
+            "usim_build": _os.environ.get("USIM_BUILD", "freq-compare-2026-09-23"),
+            "note": "Frequenzvergleich 1/3/6/10/19 MHz (6=calib); wide fullscreen band; POST /api/bowl/freq_compare; 2026-09-23",
             "template_lines": text.count("\n") + (1 if text else 0),
             "has_cup_depth": "cup_depth" in text,
             "root": str(ROOT),
@@ -598,6 +603,55 @@ async def api_bowl_sweep(body: BowlSweepIn) -> dict[str, Any]:
         data["kind"] = "titanium"
     data["calibration"] = True
     data["f0_hz"] = bowl.params.f0_hz
+    return data
+
+
+class BowlFreqCompareIn(BaseModel):
+    wide: bool = False
+    f_min_hz: float | None = None
+    f_max_hz: float | None = None
+    n_wide: int = Field(81, ge=21, le=201)
+    # Optional explicit freqs (Hz); default = compare anchors incl. 6 MHz
+    freqs_hz: list[float] | None = None
+
+
+@app.post("/api/bowl/freq_compare")
+async def api_bowl_freq_compare(body: BowlFreqCompareIn) -> dict[str, Any]:
+    """Multi-frequency stack compare for Akustik-Schale.
+
+    Anchors {1,3,6,10,19} MHz with current BowlParams. 6 MHz is CALIBRATION /
+    simulation only. wide=True returns dense 0.5–22 MHz overlay for fullscreen.
+    """
+    bowl = _get_bowl()
+    if body.freqs_hz:
+        data = bowl.compare_frequencies(
+            [float(f) for f in body.freqs_hz], allow_compare_anchors=True
+        )
+        data["kind"] = "freq_compare"
+        data["anchors_mhz"] = [float(f) / 1e6 for f in body.freqs_hz]
+        data["wide"] = None
+        if body.wide:
+            wide = bowl.freq_compare(
+                wide=True,
+                f_min_hz=body.f_min_hz if body.f_min_hz is not None else 0.5e6,
+                f_max_hz=body.f_max_hz if body.f_max_hz is not None else 22e6,
+                n_wide=body.n_wide,
+            )
+            data["wide"] = wide.get("wide")
+            data["rows"] = wide["rows"]  # keep full 5-anchor rows when wide
+            data["anchors_mhz"] = wide["anchors_mhz"]
+            data["note_6mhz"] = wide["note_6mhz"]
+            data["inputs_note"] = wide.get("inputs_note")
+    else:
+        data = bowl.freq_compare(
+            wide=bool(body.wide),
+            f_min_hz=body.f_min_hz if body.f_min_hz is not None else 0.5e6,
+            f_max_hz=body.f_max_hz if body.f_max_hz is not None else 22e6,
+            n_wide=body.n_wide,
+        )
+    data["calibration"] = True
+    data["f0_hz"] = bowl.params.f0_hz
+    data["compare_anchor_hz"] = list(COMPARE_ANCHOR_F0_HZ)
     return data
 
 

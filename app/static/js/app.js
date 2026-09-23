@@ -18,6 +18,9 @@
   let bowlTempsAbort = null;
   let bowlEnergyBusy = false;
   let bowlEnergyAbort = null;
+  let bowlFreqCompareBusy = false;
+  let bowlFreqCompareAbort = null;
+  let bowlFreqCompareCache = null;
 
   function $(id) { return document.getElementById(id); }
   function t(key) {
@@ -690,14 +693,15 @@
       data: { labels: [], datasets: [
         { label: "P_ac", data: [], backgroundColor: "#2dd4a8" },
         { label: "η", data: [], backgroundColor: "#c084fc", yAxisID: "y1" },
+        { label: "T_I", data: [], backgroundColor: "#3b9eff", yAxisID: "y1" },
       ]},
       options: {
         responsive: true, maintainAspectRatio: false,
         animation: false,
         scales: {
           y: { title: { display: true, text: "P_ac (W)" }, grid: { color: Chart.defaults.borderColor } },
-          y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η" } },
-          x: { title: { display: true, text: "f0 (MHz)" } },
+          y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η / T_I" } },
+          x: { title: { display: true, text: "f (MHz)" } },
         },
       },
     });
@@ -755,6 +759,12 @@
       bowlCharts.glue.data.datasets[0].label = t("bowl.p_ac_axis");
       bowlCharts.glue.data.datasets[1].label = t("bowl.eff_axis");
       bowlCharts.glue.options.scales.x.title.text = t("bowl.glue_um");
+    }
+    if (bowlCharts.f0) {
+      bowlCharts.f0.data.datasets[0].label = t("bowl.p_ac_axis");
+      bowlCharts.f0.data.datasets[1].label = t("bowl.eff_axis");
+      if (bowlCharts.f0.data.datasets[2]) bowlCharts.f0.data.datasets[2].label = "T_I";
+      bowlCharts.f0.options.scales.x.title.text = t("bowl.freq_compare_x") || "f (MHz)";
     }
     if (bowlCharts.ti) bowlCharts.ti.options.scales.x.title.text = t("bowl.ti_mm");
     try { applyEnergyDoughnut(); } catch (err) { console.warn(err); }
@@ -989,6 +999,23 @@
     }
   }
 
+
+  function applyFreqCompareChart(data) {
+    if (!bowlCharts.f0 || !data || !data.rows) return;
+    bowlFreqCompareCache = data;
+    const rows = data.rows;
+    bowlCharts.f0.data.labels = rows.map((r) => {
+      const mhz = Number(r.f0_mhz);
+      return (Math.abs(mhz - 6) < 0.01) ? "6*" : String(mhz);
+    });
+    bowlCharts.f0.data.datasets[0].data = freshArray(rows.map((r) => r.p_ac_w));
+    bowlCharts.f0.data.datasets[1].data = freshArray(rows.map((r) => r.efficiency));
+    if (bowlCharts.f0.data.datasets[2]) {
+      bowlCharts.f0.data.datasets[2].data = freshArray(rows.map((r) => r.t_at_f0));
+    }
+    bumpChart(bowlCharts.f0);
+  }
+
   async function analyzeBowl() {
     if (bowlAnalyzeBusy) return;
     bowlAnalyzeBusy = true;
@@ -1040,7 +1067,7 @@
         postJSON("/api/bowl/sweep", { kind: "titanium", h_min_m: 5e-5, h_max_m: 3e-3, n: 100 }, signal),
         getJSON("/api/bowl/field?nx=48&nr=24", signal),
         postJSON("/api/bowl/sweep", { kind: "piezo_diameter", n: 24 }, signal),
-        postJSON("/api/bowl/sweep", { kind: "f0", n: 4 }, signal),
+        postJSON("/api/bowl/freq_compare", { wide: false }, signal),
         getJSON("/api/bowl/profile?n_per_layer=16", signal),
       ]);
       if (bowlCharts.spectrum) {
@@ -1081,12 +1108,7 @@
         bowlCharts.dia.data.datasets[1].data = dia.i_sata_w_cm2 || [];
         bumpChart(bowlCharts.dia);
       }
-      if (bowlCharts.f0 && f0c.rows) {
-        bowlCharts.f0.data.labels = f0c.rows.map((r) => String(r.f0_mhz));
-        bowlCharts.f0.data.datasets[0].data = f0c.rows.map((r) => r.p_ac_w);
-        bowlCharts.f0.data.datasets[1].data = f0c.rows.map((r) => r.efficiency);
-        bumpChart(bowlCharts.f0);
-      }
+      if (f0c && f0c.rows) applyFreqCompareChart(f0c);
       if (bowlCharts.profile) {
         bowlCharts.profile.data.labels = (prof.z_mm || []).map((v) => Number(v).toFixed(2));
         bowlCharts.profile.data.datasets[0].data = prof.pressure_abs || [];
@@ -1642,8 +1664,53 @@
   if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("input", () => clampPiezoDiameter(true));
   if ($("bowlPiezoD")) $("bowlPiezoD").addEventListener("change", () => clampPiezoDiameter(true));
   $("btnBowlAnalyze").addEventListener("click", analyzeBowl);
+
+  async function refreshBowlFreqCompareOnly() {
+    if (bowlFreqCompareBusy) return;
+    bowlFreqCompareBusy = true;
+    const btn = $("btnBowlFreqCompareRefresh");
+    const labelBusy = t("bowl.btn_freq_compare_refresh_busy");
+    const labelIdle = t("bowl.btn_freq_compare_refresh");
+    if (btn) {
+      btn.disabled = true;
+      btn.classList.add("is-busy");
+      const span = btn.querySelector("[data-freq-compare-label]");
+      if (span) span.textContent = labelBusy;
+      else btn.textContent = labelBusy;
+    }
+    if (bowlFreqCompareAbort) {
+      try { bowlFreqCompareAbort.abort(); } catch (_) { /* ignore */ }
+    }
+    bowlFreqCompareAbort = new AbortController();
+    const signal = bowlFreqCompareAbort.signal;
+    try {
+      ensureBowl();
+      await postJSON("/api/bowl/params", bowlPayload(), signal);
+      const data = await postJSON("/api/bowl/freq_compare", { wide: false }, signal);
+      applyFreqCompareChart(data);
+      if (btn) btn.title = t("bowl.btn_freq_compare_refresh_title");
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      console.warn("refreshBowlFreqCompareOnly", err);
+      const hint = String((err && err.message) || err || "freq compare refresh failed");
+      if (btn) btn.title = hint;
+    } finally {
+      bowlFreqCompareBusy = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove("is-busy");
+        const span = btn.querySelector("[data-freq-compare-label]");
+        if (span) {
+          span.setAttribute("data-i18n", "bowl.btn_freq_compare_refresh");
+          span.textContent = labelIdle;
+        } else btn.textContent = labelIdle;
+      }
+    }
+  }
+
   if ($("btnBowlTempsRefresh")) $("btnBowlTempsRefresh").addEventListener("click", refreshBowlTempsOnly);
   if ($("btnBowlEnergyRefresh")) $("btnBowlEnergyRefresh").addEventListener("click", refreshBowlEnergyOnly);
+  if ($("btnBowlFreqCompareRefresh")) $("btnBowlFreqCompareRefresh").addEventListener("click", refreshBowlFreqCompareOnly);
 
   document.querySelectorAll("#bowlEnergyPhase .preset-chip").forEach((b) => {
     b.addEventListener("click", () => applyEnergyDoughnut(b.dataset.phase));
@@ -1695,7 +1762,7 @@
     chartBowlEnergy: "bowl.caption_energy",
     chartBowlField: "bowl.caption_field",
     chartBowlDia: "bowl.caption_dia",
-    chartBowlF0: "bowl.caption_f0",
+    chartBowlF0: "bowl.caption_freq_compare",
     chartBowlProfile: "bowl.caption_profile",
     chartBowlPhase: "bowl.caption_phase",
     chartBowlTemps: "bowl.caption_temps",
@@ -1763,7 +1830,7 @@
       const map = {
         spectrum: "bowl.spectrum", glue: "bowl.sweep_glue", ti: "bowl.sweep_ti",
         energy: "bowl.energy", field: "bowl.field", dia: "bowl.sweep_dia",
-        f0: "bowl.sweep_f0", profile: "bowl.profile", phase: "bowl.phase",
+        f0: "bowl.freq_compare", profile: "bowl.profile", phase: "bowl.phase",
         temps: "bowl.chart_temps", pacEta: "bowl.chart_pac_eta",
         derate: "bowl.chart_derate", losses: "bowl.chart_losses",
       };
@@ -1946,6 +2013,37 @@
         },
       };
     }
+    if (canvasId === "chartBowlF0") {
+      const fc = await postJSON("/api/bowl/freq_compare", {
+        wide: true, f_min_hz: 0.5e6, f_max_hz: 22e6, n_wide: 101,
+      });
+      const w = fc.wide || {};
+      const labels = (w.f_mhz || []).map((v) => Number(v).toFixed(2));
+      const anchors = new Set((fc.anchors_mhz || [1, 3, 6, 10, 19]).map(Number));
+      const pointR = (w.f_mhz || []).map((v) => (anchors.has(Math.round(Number(v) * 100) / 100) || [...anchors].some((a) => Math.abs(a - Number(v)) < 0.08)) ? 5 : 0);
+      return {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            { label: t("bowl.p_ac_axis") || "P_ac", data: freshArray(w.p_ac_w), borderColor: "#2dd4a8", backgroundColor: "transparent", borderWidth: 2, pointRadius: pointR, pointBackgroundColor: "#2dd4a8" },
+            { label: t("bowl.eff_axis") || "η", data: freshArray(w.efficiency), borderColor: "#c084fc", backgroundColor: "transparent", borderWidth: 2, pointRadius: pointR, pointBackgroundColor: "#c084fc", yAxisID: "y1" },
+            { label: "T_I", data: freshArray(w.t_at_f0), borderColor: "#3b9eff", backgroundColor: "transparent", borderWidth: 1.5, borderDash: [4, 3], pointRadius: 0, yAxisID: "y1" },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          scales: {
+            x: { title: { display: true, text: "f (MHz) · wide 0.5–22 · *6=CALIB" } },
+            y: { title: { display: true, text: "P_ac (W)" } },
+            y1: { position: "right", min: 0, max: 1, grid: { drawOnChartArea: false }, title: { display: true, text: "η / T_I" } },
+          },
+          plugins: {
+            title: { display: true, text: t("bowl.freq_compare_wide_title") || "P_ac(f) / η(f) · anchors 1/3/6*/10/19" },
+          },
+        },
+      };
+    }
     return null;
   }
 
@@ -1981,7 +2079,7 @@
     let cfg = null;
     const wideIds = {
       chartBowlSpectrum: 1, chartBowlPhase: 1, chartBowlGlue: 1, chartBowlTi: 1,
-      chartBowlField: 1, chartBowlDia: 1, chartBowlEnergy: 1,
+      chartBowlField: 1, chartBowlDia: 1, chartBowlEnergy: 1, chartBowlF0: 1,
     };
     if (wideIds[canvasId]) {
       try {

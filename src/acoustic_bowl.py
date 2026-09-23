@@ -20,8 +20,10 @@ import yaml
 
 from src.frequencies import (
     ALLOWED_F0_HZ,
+    COMPARE_ANCHOR_F0_HZ,
     frequency_policy_dict,
     half_value_depth_m,
+    resolve_compare_f0,
     suggested_piezo_thickness_m,
     validate_f0,
     wavelength_m,
@@ -1262,38 +1264,136 @@ class AcousticBowl:
         }
 
     def compare_frequencies(
-        self, freqs: list[float] | None = None
+        self,
+        freqs: list[float] | None = None,
+        *,
+        allow_compare_anchors: bool = False,
     ) -> dict[str, Any]:
-        freqs = freqs or sorted(ALLOWED_F0_HZ)
+        """Per-frequency P_ac / η / T_I with auto λ/2 piezo.
+
+        Default freqs = therapy set {1,3,10,19} MHz.
+        With allow_compare_anchors=True (or freqs including 6e6), 6 MHz is kept
+        as CALIBRATION/simulation-only — not snapped into the therapy set.
+        """
+        if freqs is None:
+            freqs = list(COMPARE_ANCHOR_F0_HZ) if allow_compare_anchors else sorted(ALLOWED_F0_HZ)
         original_f = self.params.f0_hz
         original_h = self.params.piezo_thickness_m
         rows = []
-        for f in freqs:
-            f = validate_f0(float(f))
-            self.params.f0_hz = f
-            # auto λ/2 for fair geometry compare unless user locked thickness
-            self.params.piezo_thickness_m = None
-            e = self.energy_partition()
-            t_i, r_i, zin = self.transmission_reflection(f)
-            mats = self._materials()
-            h = self.params.resolved_piezo_thickness(mats["pzt"].c_m_s)
-            rows.append(
-                {
-                    "f0_hz": f,
-                    "f0_mhz": f / 1e6,
-                    "t_at_f0": t_i,
-                    "r_at_f0": r_i,
-                    "p_ac_w": e.p_radiated_w,
-                    "efficiency": e.efficiency,
-                    "lambda_mm": wavelength_m(f) * 1e3,
-                    "piezo_h_um": h * 1e6,
-                    "x_half_mm": half_value_depth_m(f) * 1e3,
-                    "z_in_mag": float(abs(zin)),
-                }
-            )
-        self.params.f0_hz = original_f
-        self.params.piezo_thickness_m = original_h
-        return {"calibration": True, "rows": rows, "fixed_geometry_note": "piezo auto λ/2 per f0"}
+        try:
+            for f_in in freqs:
+                if allow_compare_anchors or any(
+                    abs(float(f_in) - a) < 1.0 for a in COMPARE_ANCHOR_F0_HZ
+                ):
+                    f = resolve_compare_f0(float(f_in))
+                else:
+                    f = validate_f0(float(f_in))
+                self.params.f0_hz = f
+                # auto λ/2 for fair geometry compare unless user locked thickness
+                self.params.piezo_thickness_m = None
+                e = self.energy_partition()
+                t_i, r_i, zin = self.transmission_reflection(f)
+                mats = self._materials()
+                h = self.params.resolved_piezo_thickness(mats["pzt"].c_m_s)
+                is_6 = abs(f - 6e6) < 1.0
+                rows.append(
+                    {
+                        "f0_hz": f,
+                        "f0_mhz": f / 1e6,
+                        "t_at_f0": t_i,
+                        "r_at_f0": r_i,
+                        "p_ac_w": e.p_radiated_w,
+                        "efficiency": e.efficiency,
+                        "lambda_mm": wavelength_m(f) * 1e3,
+                        "piezo_h_um": h * 1e6,
+                        "x_half_mm": half_value_depth_m(f) * 1e3,
+                        "z_in_mag": float(abs(zin)),
+                        "calib_only": bool(is_6),
+                        "label": "6 MHz (CALIBRATION)" if is_6 else f"{f/1e6:g} MHz",
+                    }
+                )
+        finally:
+            self.params.f0_hz = original_f
+            self.params.piezo_thickness_m = original_h
+        return {
+            "calibration": True,
+            "rows": rows,
+            "fixed_geometry_note": "piezo auto λ/2 per f0",
+            "note_6mhz": (
+                "6 MHz is a CALIBRATION / simulation compare anchor only — "
+                "not a factory Skinova firmware frequency."
+            ),
+        }
+
+    def freq_compare(
+        self,
+        *,
+        wide: bool = False,
+        f_min_hz: float = 0.5e6,
+        f_max_hz: float = 22e6,
+        n_wide: int = 81,
+    ) -> dict[str, Any]:
+        """Five-anchor compare {1,3,6,10,19} MHz + optional dense band for fullscreen.
+
+        Uses current BowlParams (bond/shape/drive/load/…). Piezo thickness is
+        auto λ/2 per frequency for a fair stack comparison.
+        """
+        anchors = self.compare_frequencies(
+            list(COMPARE_ANCHOR_F0_HZ), allow_compare_anchors=True
+        )
+        out: dict[str, Any] = {
+            "calibration": True,
+            "kind": "freq_compare",
+            "anchors_mhz": [f / 1e6 for f in COMPARE_ANCHOR_F0_HZ],
+            "rows": anchors["rows"],
+            "fixed_geometry_note": anchors["fixed_geometry_note"],
+            "note_6mhz": anchors["note_6mhz"],
+            "inputs_note": (
+                "Current bond (spread/press/cure/coverage), ti_face_shape, "
+                "thicknesses, drive, load, materials — energy_partition + T_I per f."
+            ),
+        }
+        if not wide:
+            out["wide"] = None
+            return out
+
+        f_min = float(max(0.2e6, f_min_hz))
+        f_max = float(min(30e6, f_max_hz))
+        if f_max <= f_min:
+            f_min, f_max = 0.5e6, 22e6
+        n = int(max(21, min(201, n_wide)))
+        freqs = np.linspace(f_min, f_max, n)
+        original_f = self.params.f0_hz
+        original_h = self.params.piezo_thickness_m
+        f_mhz: list[float] = []
+        p_ac: list[float] = []
+        eff: list[float] = []
+        t_list: list[float] = []
+        try:
+            for f in freqs:
+                ff = float(f)
+                self.params.f0_hz = ff
+                self.params.piezo_thickness_m = None
+                e = self.energy_partition()
+                t_i, _, _ = self.transmission_reflection(ff)
+                f_mhz.append(ff / 1e6)
+                p_ac.append(float(e.p_radiated_w))
+                eff.append(float(e.efficiency))
+                t_list.append(float(t_i))
+        finally:
+            self.params.f0_hz = original_f
+            self.params.piezo_thickness_m = original_h
+        out["wide"] = {
+            "f_mhz": f_mhz,
+            "p_ac_w": p_ac,
+            "efficiency": eff,
+            "t_at_f0": t_list,
+            "f_min_hz": f_min,
+            "f_max_hz": f_max,
+            "n": n,
+            "anchor_mhz": [f / 1e6 for f in COMPARE_ANCHOR_F0_HZ],
+        }
+        return out
 
     def time_of_flight(self) -> dict[str, Any]:
         layers = self.build_layers()

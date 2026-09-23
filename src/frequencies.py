@@ -13,6 +13,11 @@ from typing import Any
 ALLOWED_F0_HZ: frozenset[float] = frozenset({1e6, 3e6, 10e6, 19e6})
 ALLOWED_F0_MHZ: tuple[int, ...] = (1, 3, 10, 19)
 
+# Multi-frequency compare anchors for Akustik-Schale (educational).
+# Includes 6 MHz as CALIBRATION / simulation-only — NOT a factory Skinova firmware hop.
+COMPARE_ANCHOR_F0_HZ: tuple[float, ...] = (1e6, 3e6, 6e6, 10e6, 19e6)
+COMPARE_ANCHOR_F0_MHZ: tuple[float, ...] = (1.0, 3.0, 6.0, 10.0, 19.0)
+
 # Manufacturer-ish home defaults (immutable product story)
 HOME_DEFAULT_F0_HZ: dict[str, float] = {
     "SKINOVA_10": 10e6,
@@ -50,6 +55,18 @@ def is_allowed_f0(f_hz: float) -> bool:
     return any(abs(f_hz - a) < 1.0 for a in ALLOWED_F0_HZ)
 
 
+def is_compare_anchor_f0(f_hz: float) -> bool:
+    return any(abs(f_hz - a) < 1.0 for a in COMPARE_ANCHOR_F0_HZ)
+
+
+def resolve_compare_f0(f_hz: float) -> float:
+    """Keep exact compare anchors (incl. 6 MHz calib); else snap to therapy set."""
+    for a in COMPARE_ANCHOR_F0_HZ:
+        if abs(float(f_hz) - a) < 1.0:
+            return a
+    return validate_f0(float(f_hz))
+
+
 def wavelength_m(f_hz: float, c: float = C_TISSUE) -> float:
     return c / f_hz
 
@@ -60,20 +77,29 @@ def suggested_piezo_thickness_m(f_hz: float, c_pzt: float = C_PZT_DEFAULT) -> fl
 
 
 def half_value_depth_m(f_hz: float, overrides: dict[Any, float] | None = None) -> float:
-    """Return x½ for f0; prefer exact key, then override map, then physics scale."""
-    f = validate_f0(f_hz)
+    """Return x½ for f0; prefer exact key, then override map, then physics scale.
+
+    Unknown frequencies (e.g. 6 MHz compare-anchor) use α∝f from the 10 MHz claim
+    without snapping into the therapy set — CALIBRATION only.
+    """
+    f_raw = float(f_hz)
     if overrides:
-        key_str = str(int(f))
+        key_str = str(int(round(f_raw)))
         if key_str in overrides:
             return float(overrides[key_str])
-        if f in overrides:
-            return float(overrides[f])
-        if int(f) in overrides:
-            return float(overrides[int(f)])
-    if f in HALF_VALUE_DEPTH_M:
-        return HALF_VALUE_DEPTH_M[f]
-    # fallback α∝f from 10 MHz
-    return 0.003 * (10e6 / f)
+        if f_raw in overrides:
+            return float(overrides[f_raw])
+        if int(round(f_raw)) in overrides:
+            return float(overrides[int(round(f_raw))])
+    for a, v in HALF_VALUE_DEPTH_M.items():
+        if abs(f_raw - a) < 1.0:
+            return float(v)
+    if is_allowed_f0(f_raw):
+        f = validate_f0(f_raw)
+        if f in HALF_VALUE_DEPTH_M:
+            return HALF_VALUE_DEPTH_M[f]
+    # fallback α∝f from 10 MHz (covers 6 MHz calib compare)
+    return 0.003 * (10e6 / max(f_raw, 1.0))
 
 
 def piezo_thickness_suggestions() -> dict[str, float]:
@@ -92,6 +118,8 @@ def frequency_policy_dict() -> dict[str, Any]:
     return {
         "allowed_hz": sorted(ALLOWED_F0_HZ),
         "allowed_mhz": list(ALLOWED_F0_MHZ),
+        "compare_anchor_hz": list(COMPARE_ANCHOR_F0_HZ),
+        "compare_anchor_mhz": list(COMPARE_ANCHOR_F0_MHZ),
         "home_defaults_hz": dict(HOME_DEFAULT_F0_HZ),
         "half_value_depth_m": {str(int(k)): v for k, v in HALF_VALUE_DEPTH_M.items()},
         "wavelength_m_tissue": wavelength_suggestions(),
@@ -100,6 +128,7 @@ def frequency_policy_dict() -> dict[str, Any]:
             "Allowed set {1,3,10,19} MHz for simulation. "
             "Home models default 10/19 MHz; 1/3 MHz are clinical/LDM-class options "
             "(not claiming factory home firmware frequency hops). "
-            "x½ for 1/3 MHz is calibration (α∝f scaled from 10 MHz claim)."
+            "x½ for 1/3 MHz is calibration (α∝f scaled from 10 MHz claim). "
+            "Compare window also includes 6 MHz as CALIBRATION/simulation anchor only."
         ),
     }

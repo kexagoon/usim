@@ -1012,20 +1012,24 @@
             <div class="chart-wrap tall"><canvas id="chartBowlDia"></canvas></div>
             <p class="caption" data-i18n="bowl.caption_dia"></p>
           </section>
-          <section class="chart-card">
+          <section class="chart-card" id="bowlFreqCompareCard">
             <div class="card-head">
-              <h2 class="card-title" data-i18n="bowl.sweep_f0">f0 Vergleich 1/3/10/19</h2>
+              <h2 class="card-title" data-i18n="bowl.freq_compare">Frequenzvergleich</h2>
               <div class="chart-tools">
-                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlF0" data-info-key="bowl.info_f0" title="Expand" aria-label="Expand">
+                <button type="button" class="chart-tool-btn chart-tool-btn-text" id="btnBowlFreqCompareRefresh" data-i18n-title="bowl.btn_freq_compare_refresh_title" title="Vergleich neu berechnen" aria-label="Vergleich neu berechnen">
+                  <span aria-hidden="true">↺</span><span data-freq-compare-label data-i18n="bowl.btn_freq_compare_refresh">Vergleich neu berechnen</span>
+                </button>
+                <button type="button" class="chart-tool-btn" data-chart-expand="chartBowlF0" data-expand-wide="1" data-info-key="bowl.info_freq_compare" title="Expand" aria-label="Expand">
                   <span aria-hidden="true">⛶</span><span class="sr-only" data-i18n="bowl.expand">Expand</span>
                 </button>
-                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlF0" data-info-key="bowl.info_f0" title="Info" aria-label="Info">
+                <button type="button" class="chart-tool-btn" data-chart-info="chartBowlF0" data-info-key="bowl.info_freq_compare" title="Info" aria-label="Info">
                   <span aria-hidden="true">ⓘ</span><span class="sr-only" data-i18n="bowl.info">Info</span>
                 </button>
               </div>
             </div>
             <div class="chart-wrap tall"><canvas id="chartBowlF0"></canvas></div>
-            <p class="caption" data-i18n="bowl.caption_f0"></p>
+            <p class="caption" data-i18n="bowl.caption_freq_compare"></p>
+            <p class="caption muted" data-i18n="bowl.caption_freq_compare_6mhz"></p>
           </section>
           <section class="chart-card wide">
             <div class="card-head">

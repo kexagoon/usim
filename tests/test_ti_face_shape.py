@@ -118,5 +118,5 @@ def test_build_stamp_ti_shape():
 
     client = TestClient(app)
     body = client.get("/api/build").json()
-    assert body["version"] == "1.3.4-ti-shape"
-    assert "ti-shape" in body["usim_build"]
+    assert body["version"] == "1.3.5-freq-compare"
+    assert "freq-compare" in body["usim_build"]
